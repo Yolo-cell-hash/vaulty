@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Vaulty is air-gapped. ML Kit's bundled telemetry library (datatransport)
+         merges in INTERNET; stripping it guarantees nothing can leave the device.
+         Debug builds keep it because `flutter run` needs it to attach. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+</manifest>
