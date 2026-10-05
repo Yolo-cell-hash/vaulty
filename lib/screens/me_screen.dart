@@ -1,7 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/vault_database.dart';
@@ -11,10 +11,12 @@ import '../services/notification_service.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive.dart';
 import '../widgets/common.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/mascot.dart';
 import '../widgets/memory_cards.dart';
+import '../widgets/nav_bar.dart';
 import '../widgets/reminder_sheet.dart';
 import 'backup_screen.dart';
 import 'tag_screen.dart';
@@ -31,6 +33,9 @@ class MeScreen extends ConsumerWidget {
     final people = ref.watch(peopleProvider).length;
     final notifier = ref.read(settingsProvider.notifier);
     final name = settings.name.trim();
+    // iOS names the unlock it actually has; Android copy stays generic.
+    final ios = context.isCupertino;
+    final biometric = ref.watch(biometricProvider).value ?? Biometric.faceId;
     void push(Widget page) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
     return ListView(
@@ -88,8 +93,10 @@ class MeScreen extends ConsumerWidget {
           children: [
             ListRow(
               title: 'App lock',
-              subtitle: Platform.isIOS ? 'Face ID or passcode to open' : 'Fingerprint or PIN to open',
-              glyph: Platform.isIOS ? G.faceId : G.fingerprint,
+              subtitle: !ios
+                  ? 'Fingerprint or PIN to open'
+                  : (biometric == Biometric.passcode ? 'Passcode to open' : '${biometric.label} or passcode to open'),
+              glyph: ios ? biometric.glyph : G.fingerprint,
               chevron: false,
               trailing: Switch.adaptive(
                 value: settings.lockEnabled,
@@ -101,7 +108,7 @@ class MeScreen extends ConsumerWidget {
                   }
                   final ok = await AuthService.authenticate(v ? 'Turn on app lock' : 'Turn off app lock');
                   if (!ok) return;
-                  HapticFeedback.mediumImpact();
+                  Haptics.success();
                   await notifier.change((s) => s.copyWith(lockEnabled: v));
                   if (v) ref.read(unlockedProvider.notifier).set(true);
                 },
@@ -195,6 +202,19 @@ class MeScreen extends ConsumerWidget {
   }
 
   Future<void> _editName(BuildContext context, WidgetRef ref, String current) async {
+    if (context.isCupertino) {
+      final name = await showTextAlert(
+        context,
+        title: 'What should we call you?',
+        initial: current,
+        placeholder: 'Name or nickname',
+        capitalization: TextCapitalization.words,
+        maxLength: 24,
+        allowEmpty: true,
+      );
+      if (name != null) await ref.read(settingsProvider.notifier).change((s) => s.copyWith(name: name.trim()));
+      return;
+    }
     final ctrl = TextEditingController(text: current);
     final name = await showModalBottomSheet<String>(
       context: context,
@@ -304,6 +324,24 @@ class _ThemePicker extends StatelessWidget {
       (ThemeMode.dark, G.moon, 'Dark'),
       (ThemeMode.system, G.phone, 'System'),
     ];
+    if (context.isCupertino) {
+      return CupertinoSlidingSegmentedControl<ThemeMode>(
+        groupValue: value,
+        onValueChanged: (m) {
+          if (m != null) onChanged(m);
+        },
+        children: {
+          for (final (mode, glyph, label) in options)
+            mode: Semantics(
+              label: '$label theme',
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                child: VIcon(glyph, size: 16, color: value == mode ? c.ink : c.inkFaint),
+              ),
+            ),
+        },
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(color: c.sunken, borderRadius: BorderRadius.circular(999)),
@@ -339,8 +377,10 @@ class _ArchivedScreen extends ConsumerWidget {
     final archived = ref.watch(archivedProvider);
     final items = archived.value ?? const [];
     return Scaffold(
-      appBar: AppBar(
+      appBar: vAppBar(
+        context,
         leading: VIconButton(G.chevronLeft, label: 'Back', onTap: () => Navigator.pop(context)),
+        largeTitle: 'Archived',
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 40),
@@ -350,7 +390,7 @@ class _ArchivedScreen extends ConsumerWidget {
             child: Text('Archived', style: context.type.display.copyWith(fontSize: 36)),
           ),
           if (archived.isLoading && !archived.hasValue)
-            const Center(child: CircularProgressIndicator(strokeWidth: 2))
+            const Center(child: Spinner())
           else if (items.isEmpty)
             const EmptyState(
               title: 'Nothing archived',

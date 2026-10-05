@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -238,6 +239,10 @@ extension VaultyThemeX on BuildContext {
   VaultyColors get vc => Theme.of(this).extension<VaultyColors>()!;
   VType get type => VType(vc);
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  /// True on iOS, where system pieces (dialogs, pickers, menus, sheets) take
+  /// the platform's own form. The brand layer looks the same everywhere.
+  bool get isCupertino => Theme.of(this).platform == TargetPlatform.iOS;
 }
 
 /// Spacing & radius scale. Stick to these.
@@ -253,6 +258,7 @@ class AppTheme {
   static ThemeData build(Brightness brightness) {
     final c = brightness == Brightness.dark ? VaultyColors.dark : VaultyColors.light;
     final t = VType(c);
+    final ios = defaultTargetPlatform == TargetPlatform.iOS;
     final scheme = ColorScheme.fromSeed(
       seedColor: c.brand,
       brightness: brightness,
@@ -323,8 +329,14 @@ class AppTheme {
         backgroundColor: c.bg,
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
-        dragHandleColor: c.line,
-        dragHandleSize: const Size(36, 4),
+        // iOS: the system grabber (tertiary label, 36x5) and its lighter dim.
+        dragHandleColor: !ios
+            ? c.line
+            : (brightness == Brightness.dark ? const Color(0x4DEBEBF5) : const Color(0x4D3C3C43)),
+        dragHandleSize: Size(36, ios ? 5 : 4),
+        modalBarrierColor: !ios
+            ? null
+            : (brightness == Brightness.dark ? const Color(0x7A000000) : const Color(0x33000000)),
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.xl))),
       ),
       dialogTheme: DialogThemeData(

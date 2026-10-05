@@ -1,13 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/auth_service.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive.dart';
 import '../widgets/common.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/mascot.dart';
@@ -45,10 +43,10 @@ class _LockScreenState extends ConsumerState<LockScreen> {
     final ok = await AuthService.authenticate('Unlock Vaulty');
     if (!mounted) return;
     if (ok) {
-      HapticFeedback.mediumImpact();
+      Haptics.success();
       ref.read(unlockedProvider.notifier).set(true);
     } else {
-      HapticFeedback.heavyImpact();
+      Haptics.error();
       setState(() {
         _busy = false;
         _failed = true;
@@ -60,6 +58,8 @@ class _LockScreenState extends ConsumerState<LockScreen> {
   Widget build(BuildContext context) {
     final c = context.vc;
     final name = ref.watch(settingsProvider.select((s) => s.name.trim()));
+    final ios = context.isCupertino;
+    final biometric = ref.watch(biometricProvider).value ?? Biometric.faceId;
     return Material(
       color: c.bg,
       child: SafeArea(
@@ -97,8 +97,8 @@ class _LockScreenState extends ConsumerState<LockScreen> {
               ),
               const Spacer(flex: 3),
               VButton(
-                label: Platform.isIOS ? 'Unlock with Face ID' : 'Unlock',
-                icon: Platform.isIOS ? G.faceId : G.fingerprint,
+                label: ios ? 'Unlock with ${biometric.label}' : 'Unlock',
+                icon: ios ? biometric.glyph : G.fingerprint,
                 busy: _busy,
                 onPressed: _unlock,
               ),

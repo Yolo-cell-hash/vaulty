@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/memory.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive.dart';
 import '../widgets/common.dart';
+import '../widgets/flow_sheet.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/mascot.dart';
 import '../widgets/memory_cards.dart';
+import '../widgets/nav_bar.dart';
 import '../widgets/tag_widgets.dart';
 import 'capture/quick_capture_screen.dart';
 
@@ -26,11 +29,20 @@ class _TagScreenState extends ConsumerState<TagScreen> {
   late String _tagId = widget.tagId;
 
   Future<void> _rename(Tag tag) async {
-    final name = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _RenameSheet(tag: tag),
-    );
+    final name = context.isCupertino
+        ? await showTextAlert(
+            context,
+            title: tag.isPerson ? 'Rename person' : 'Rename tag',
+            message: 'Use a name that already exists to merge the two.',
+            initial: tag.name,
+            placeholder: 'Name',
+            capitalization: tag.isPerson ? TextCapitalization.words : TextCapitalization.none,
+          ).then((raw) => raw == null ? null : _cleanName(raw, tag))
+        : await showModalBottomSheet<String>(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => _RenameSheet(tag: tag),
+          );
     if (name == null || !mounted) return;
     final toast = toaster(context);
     final survivor = await ref.read(vaultProvider.notifier).updateTag(Tag(id: tag.id, name: name, kind: tag.kind));
@@ -63,14 +75,16 @@ class _TagScreenState extends ConsumerState<TagScreen> {
         .where((m) => m.tags.any((t) => t.id == _tagId))
         .toList();
     if (tag == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+      return const Scaffold(body: Center(child: Spinner()));
     }
     final dated = items.where((m) => m.hasExpiry).toList()..sort((a, b) => a.nextDate!.compareTo(b.nextDate!));
     final bank = items.where((m) => !m.hasExpiry).toList();
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: vAppBar(
+        context,
         leading: VIconButton(G.chevronLeft, label: 'Back', onTap: () => Navigator.pop(context)),
+        largeTitle: tag.label,
         actions: [
           VIconButton(G.pen, label: 'Rename', onTap: () => _rename(tag)),
           VIconButton(G.trash, label: 'Remove', color: c.danger, onTap: () => _delete(tag)),
@@ -139,12 +153,11 @@ class _TagScreenState extends ConsumerState<TagScreen> {
             child: VButton(
               label: tag.isPerson ? 'Add something for ${tag.name}' : 'Add to ${tag.label}',
               icon: G.plus,
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => QuickCaptureScreen(
-                    initialText: tag.isPerson ? "${tag.name}'s " : ' #${tag.name}',
-                    cursorAtStart: !tag.isPerson,
-                  ),
+              onPressed: () => presentFlow<void>(
+                context,
+                (_) => QuickCaptureScreen(
+                  initialText: tag.isPerson ? "${tag.name}'s " : ' #${tag.name}',
+                  cursorAtStart: !tag.isPerson,
                 ),
               ),
             ),
@@ -153,6 +166,12 @@ class _TagScreenState extends ConsumerState<TagScreen> {
       ),
     );
   }
+}
+
+/// People keep their capitals; tags are lowercase without the #.
+String _cleanName(String raw, Tag tag) {
+  final name = raw.trim().replaceAll(RegExp(r'^#'), '');
+  return tag.isPerson ? name : name.toLowerCase();
 }
 
 class _RenameSheet extends StatefulWidget {
@@ -204,8 +223,7 @@ class _RenameSheetState extends State<_RenameSheet> {
                   ? null
                   : () {
                       HapticFeedback.mediumImpact();
-                      final raw = _name.text.trim().replaceAll(RegExp(r'^#'), '');
-                      Navigator.pop(context, widget.tag.isPerson ? raw : raw.toLowerCase());
+                      Navigator.pop(context, _cleanName(_name.text, widget.tag));
                     },
             ),
           ],
@@ -234,8 +252,10 @@ class ManageTagsScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: vAppBar(
+        context,
         leading: VIconButton(G.chevronLeft, label: 'Back', onTap: () => Navigator.pop(context)),
+        largeTitle: 'People & tags',
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 40),

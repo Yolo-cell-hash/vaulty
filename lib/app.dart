@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'screens/home_shell.dart';
@@ -87,6 +89,8 @@ class _VaultyAppState extends ConsumerState<VaultyApp> {
         _hiddenAt ??= DateTime.now();
         setState(() => _obscured = true);
       case AppLifecycleState.resumed:
+        // Face ID may have been set up in Settings while we were away.
+        ref.invalidate(biometricProvider);
         final away = _hiddenAt == null ? Duration.zero : DateTime.now().difference(_hiddenAt!);
         _hiddenAt = null;
         if (away >= _grace) {
@@ -113,20 +117,31 @@ class _VaultyAppState extends ConsumerState<VaultyApp> {
       theme: AppTheme.build(Brightness.light),
       darkTheme: AppTheme.build(Brightness.dark),
       themeMode: settings.themeMode,
+      scrollBehavior: const _ScrollBehavior(),
       home: const _RootGate(),
       // Honour the system text size up to 2x; past that the serif display
       // lines stop fitting on a phone. Dense widgets clamp lower themselves.
-      builder: (context, child) => MediaQuery.withClampedTextScaling(
-        maxScaleFactor: 2,
-        child: Stack(
-          children: [
-            ?child,
-            if (locked) const Positioned.fill(child: LockScreen()),
-            if (_obscured && !locked) const Positioned.fill(child: _PrivacyCover()),
-            // Launch intro sits above everything and hands off from the native splash.
-            if (!introDone)
-              Positioned.fill(child: SplashIntro(onDone: () => ref.read(splashDoneProvider.notifier).finish())),
-          ],
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        // Status bar text follows the app's theme, not the system's, on pages
+        // without an app bar to set it (the tabs, the lock screen). Only the
+        // status bar: the navigation bar keeps its own settings.
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarBrightness: context.isDark ? Brightness.dark : Brightness.light,
+          statusBarIconBrightness: context.isDark ? Brightness.light : Brightness.dark,
+        ),
+        child: MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 2,
+          child: Stack(
+            children: [
+              ?child,
+              if (locked) const Positioned.fill(child: LockScreen()),
+              if (_obscured && !locked) const Positioned.fill(child: _PrivacyCover()),
+              // Launch intro sits above everything and hands off from the native splash.
+              if (!introDone)
+                Positioned.fill(child: SplashIntro(onDone: () => ref.read(splashDoneProvider.notifier).finish())),
+            ],
+          ),
         ),
       ),
     );
@@ -148,6 +163,19 @@ class _RootGate extends ConsumerWidget {
       ),
       child: onboarded ? const HomeShell() : const OnboardingFlow(),
     );
+  }
+}
+
+/// iOS shows a scroll indicator while a page moves; Android keeps none.
+class _ScrollBehavior extends MaterialScrollBehavior {
+  const _ScrollBehavior();
+
+  @override
+  Widget buildScrollbar(BuildContext context, Widget child, ScrollableDetails details) {
+    if (getPlatform(context) == TargetPlatform.iOS && axisDirectionToAxis(details.direction) == Axis.vertical) {
+      return CupertinoScrollbar(controller: details.controller, child: child);
+    }
+    return super.buildScrollbar(context, child, details);
   }
 }
 

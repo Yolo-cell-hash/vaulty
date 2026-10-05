@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,9 +29,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Timer? _debounce;
   List<String> _ids = [];
   bool _searching = false;
+  bool _focused = false;
   int _seq = 0;
 
   static const _prompts = ["Mom's shoe size", 'Passport expiry', 'Paint color', 'Wi-Fi password', 'Policy number'];
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() => setState(() => _focused = _focus.hasFocus));
+  }
 
   @override
   void didUpdateWidget(SearchScreen old) {
@@ -65,6 +73,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _ids = ids;
       _searching = false;
     });
+  }
+
+  void _cancel() {
+    _controller.clear();
+    _onChanged('');
+    _focus.unfocus();
   }
 
   void _usePrompt(String p) {
@@ -111,43 +125,65 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     const SizedBox(height: 6),
                     Text('Casual questions work. It all stays on this phone.', style: context.type.bodySoft),
                     const SizedBox(height: 20),
-                    TextField(
-                      controller: _controller,
-                      focusNode: _focus,
-                      onChanged: _onChanged,
-                      textInputAction: TextInputAction.search,
-                      style: context.type.body.copyWith(fontSize: 16),
-                      decoration: InputDecoration(
-                        hintText: 'What’s Mom’s shoe size?',
-                        prefixIcon: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: VIcon(G.search, size: 19, color: c.inkSoft),
-                        ),
-                        suffixIcon: query.isEmpty
-                            ? null
-                            : VIconButton(
-                                G.close,
-                                label: 'Clear',
-                                size: 36,
-                                color: c.inkSoft,
-                                onTap: () {
-                                  _controller.clear();
-                                  _onChanged('');
-                                },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            focusNode: _focus,
+                            onChanged: _onChanged,
+                            textInputAction: TextInputAction.search,
+                            style: context.type.body.copyWith(fontSize: 16),
+                            decoration: InputDecoration(
+                              hintText: 'What’s Mom’s shoe size?',
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: VIcon(G.search, size: 19, color: c.inkSoft),
                               ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(999),
-                          borderSide: BorderSide(color: c.line),
+                              suffixIcon: query.isEmpty
+                                  ? null
+                                  : VIconButton(
+                                      G.close,
+                                      label: 'Clear',
+                                      size: 36,
+                                      color: c.inkSoft,
+                                      onTap: () {
+                                        _controller.clear();
+                                        _onChanged('');
+                                      },
+                                    ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(999),
+                                borderSide: BorderSide(color: c.line),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(999),
+                                borderSide: BorderSide(color: c.line),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(999),
+                                borderSide: BorderSide(color: c.ink, width: 1.4),
+                              ),
+                            ),
+                          ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(999),
-                          borderSide: BorderSide(color: c.line),
+                        // iOS: a search field in use gets a Cancel beside it.
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          child: context.isCupertino && _focused
+                              ? CupertinoButton(
+                                  padding: const EdgeInsets.only(left: 14),
+                                  minimumSize: Size.zero,
+                                  onPressed: _cancel,
+                                  child: Text(
+                                    'Cancel',
+                                    style: context.type.body.copyWith(color: c.brand, fontSize: 16),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(999),
-                          borderSide: BorderSide(color: c.ink, width: 1.4),
-                        ),
-                      ),
+                      ],
                     ),
                   ],
                 ),

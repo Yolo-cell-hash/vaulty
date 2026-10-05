@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/memory.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'glyphs.dart';
 import 'mascot.dart';
@@ -53,6 +57,14 @@ extension MemoryStyle on Memory {
   G get dateGlyph => isOccasion ? G.cake : (isRecurring ? G.repeat : G.clock);
 }
 
+extension BiometricStyle on Biometric {
+  G get glyph => switch (this) {
+    Biometric.faceId => G.faceId,
+    Biometric.touchId => G.fingerprint,
+    Biometric.passcode => G.lock,
+  };
+}
+
 // ------------------------------------------------------------ interaction --
 
 /// Quiet press feedback: a small scale + optional light haptic.
@@ -68,6 +80,7 @@ class Pressable extends StatefulWidget {
     this.selected,
     this.excludeSemantics,
     this.dimWhenDisabled = false,
+    this.highlight = false,
   });
 
   final Widget child;
@@ -89,6 +102,10 @@ class Pressable extends StatefulWidget {
   /// want this; display-only rows and chips should look normal.
   final bool dimWhenDisabled;
 
+  /// List rows: on iOS they shade while pressed, like a table cell, instead
+  /// of shrinking. Elsewhere they scale like everything else.
+  final bool highlight;
+
   @override
   State<Pressable> createState() => _PressableState();
 }
@@ -103,6 +120,12 @@ class _PressableState extends State<Pressable> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null || widget.onLongPress != null;
+    final ios = context.isCupertino;
+    final content = AnimatedOpacity(
+      opacity: enabled || !widget.dimWhenDisabled ? 1 : .4,
+      duration: const Duration(milliseconds: 150),
+      child: widget.child,
+    );
     return Semantics(
       button: enabled,
       label: widget.semanticLabel,
@@ -116,7 +139,9 @@ class _PressableState extends State<Pressable> {
         onTap: widget.onTap == null
             ? null
             : () {
-                if (widget.haptic) HapticFeedback.selectionClick();
+                // iOS keeps plain taps silent, like UIKit buttons; only
+                // selection controls (tabs, chips, options) tick.
+                if (widget.haptic && (!ios || widget.selected != null)) HapticFeedback.selectionClick();
                 widget.onTap!();
               },
         onLongPress: widget.onLongPress == null
@@ -125,16 +150,19 @@ class _PressableState extends State<Pressable> {
                 HapticFeedback.mediumImpact();
                 widget.onLongPress!();
               },
-        child: AnimatedScale(
-          scale: _down ? widget.scale : 1,
-          duration: Duration(milliseconds: _down ? 80 : 220),
-          curve: _down ? Curves.easeOut : Curves.easeOutBack,
-          child: AnimatedOpacity(
-            opacity: enabled || !widget.dimWhenDisabled ? 1 : .4,
-            duration: const Duration(milliseconds: 150),
-            child: widget.child,
-          ),
-        ),
+        child: widget.highlight && ios
+            ? AnimatedContainer(
+                duration: Duration(milliseconds: _down ? 0 : 250),
+                // Fade alpha only, so the shade never passes through grey.
+                color: context.vc.line.withValues(alpha: _down ? 1 : 0),
+                child: content,
+              )
+            : AnimatedScale(
+                scale: _down ? widget.scale : 1,
+                duration: Duration(milliseconds: _down ? 80 : 220),
+                curve: _down ? Curves.easeOut : Curves.easeOutBack,
+                child: content,
+              ),
       ),
     );
   }
@@ -189,7 +217,7 @@ class VButton extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: busy
-            ? SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2, color: fg))
+            ? Spinner(color: fg)
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -272,6 +300,8 @@ class VCard extends StatelessWidget {
     final card = Container(
       width: double.infinity,
       padding: padding,
+      // Row highlights and swipe actions stay inside the rounded corners.
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: color ?? c.surface,
         borderRadius: BorderRadius.circular(radius),
@@ -667,6 +697,7 @@ class ListRow extends StatelessWidget {
     final row = Pressable(
       onTap: onTap,
       scale: .99,
+      highlight: true,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
         child: Row(
@@ -738,14 +769,45 @@ class EmptyState extends StatelessWidget {
   }
 }
 
-typedef Toast = void Function(String message, {G icon, SnackBarAction? action});
+/// Indeterminate progress: the iOS activity indicator, or a thin ring.
+class Spinner extends StatelessWidget {
+  const Spinner({super.key, this.size = 20, this.color});
+
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => context.isCupertino
+      ? CupertinoActivityIndicator(radius: size / 2, color: color)
+      : SizedBox.square(
+          dimension: size,
+          child: CircularProgressIndicator(strokeWidth: 2, color: color),
+        );
+}
+
+/// A button on a toast ("Undo").
+class ToastAction {
+  const ToastAction(this.label, this.onPressed);
+
+  final String label;
+  final VoidCallback onPressed;
+}
+
+typedef Toast = void Function(String message, {G icon, ToastAction? action});
 
 /// Captures what a toast needs up front, so it can still be shown after the
 /// calling widget is gone (e.g. a row that was just archived or a popped page).
+///
+/// Android shows a snackbar above the nav. iOS has no snackbar, so it drops a
+/// capsule in from the top, where the system shows its own confirmations.
 Toast toaster(BuildContext context) {
+  if (context.isCupertino) {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    return (String message, {G icon = G.check, ToastAction? action}) => _TopToast.show(overlay, message, icon, action);
+  }
   final c = context.vc;
   final m = ScaffoldMessenger.of(context);
-  return (String message, {G icon = G.check, SnackBarAction? action}) {
+  return (String message, {G icon = G.check, ToastAction? action}) {
     m.hideCurrentSnackBar();
     m.showSnackBar(
       SnackBar(
@@ -756,15 +818,155 @@ Toast toaster(BuildContext context) {
             Expanded(child: Text(message)),
           ],
         ),
-        action: action,
+        action: action == null ? null : SnackBarAction(label: action.label, onPressed: action.onPressed),
         duration: const Duration(milliseconds: 2200),
       ),
     );
   };
 }
 
-void showToast(BuildContext context, String message, {G icon = G.check, SnackBarAction? action}) =>
+void showToast(BuildContext context, String message, {G icon = G.check, ToastAction? action}) =>
     toaster(context)(message, icon: icon, action: action);
+
+class _TopToast extends StatefulWidget {
+  const _TopToast({required this.message, required this.icon, this.action, required this.onGone});
+
+  final String message;
+  final G icon;
+  final ToastAction? action;
+  final VoidCallback onGone;
+
+  static OverlayEntry? _current;
+
+  static void show(OverlayState overlay, String message, G icon, ToastAction? action) {
+    if (_current?.mounted ?? false) _current!.remove();
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => _TopToast(
+        message: message,
+        icon: icon,
+        action: action,
+        onGone: () {
+          if (_current == entry) _current = null;
+          if (entry.mounted) entry.remove();
+        },
+      ),
+    );
+    _current = entry;
+    overlay.insert(entry);
+  }
+
+  @override
+  State<_TopToast> createState() => _TopToastState();
+}
+
+class _TopToastState extends State<_TopToast> with SingleTickerProviderStateMixin {
+  late final _show = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+    reverseDuration: const Duration(milliseconds: 240),
+  )..forward();
+  Timer? _timer;
+  double _drag = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Leave an Undo up long enough to reach the top of the screen for it.
+    _timer = Timer(Duration(milliseconds: widget.action == null ? 2200 : 5000), _hide);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _show.dispose();
+    super.dispose();
+  }
+
+  Future<void> _hide() async {
+    _timer?.cancel();
+    if (!mounted) return;
+    await _show.reverse();
+    widget.onGone();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.vc;
+    // Same capsule as the nav: ink on paper, lifted graphite in the dark.
+    final capsule = context.isDark ? const Color(0xFF26262C) : c.ink;
+    const fg = Color(0xFFF6F4EF);
+    final t = context.type;
+    final action = widget.action;
+    return Positioned(
+      top: MediaQuery.paddingOf(context).top + 6,
+      left: Space.l,
+      right: Space.l,
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _show,
+          builder: (context, child) {
+            final v = Curves.easeOutBack.transform(_show.value);
+            return Transform.translate(
+              offset: Offset(0, -80 * (1 - v) + _drag),
+              child: Opacity(opacity: _show.value, child: child),
+            );
+          },
+          // The overlay sits above the routes, so supply text defaults.
+          child: Material(
+            type: MaterialType.transparency,
+            child: GestureDetector(
+              onVerticalDragUpdate: (d) => setState(() => _drag = (_drag + d.delta.dy).clamp(-60.0, 8.0)),
+              onVerticalDragEnd: (d) {
+                if (_drag < -16 || d.primaryVelocity! < -300) {
+                  _hide();
+                } else {
+                  setState(() => _drag = 0);
+                }
+              },
+              child: Semantics(
+                liveRegion: true,
+                container: true,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480, minHeight: 48),
+                  child: Container(
+                    padding: EdgeInsets.fromLTRB(16, 6, action == null ? 20 : 6, 6),
+                    decoration: BoxDecoration(color: capsule, borderRadius: BorderRadius.circular(999)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        VIcon(widget.icon, size: 18, color: c.acid, stroke: 2),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            widget.message,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.item.copyWith(color: fg, fontSize: 14.5),
+                          ),
+                        ),
+                        if (action != null)
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            minimumSize: Size.zero,
+                            onPressed: () {
+                              action.onPressed();
+                              _hide();
+                            },
+                            child: Text(action.label, style: t.item.copyWith(color: c.acid, fontSize: 14.5)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 Future<bool> confirmDialog(
   BuildContext context, {
@@ -773,6 +975,30 @@ Future<bool> confirmDialog(
   required String confirm,
   bool destructive = false,
 }) async {
+  if (context.isCupertino) {
+    // HIG: Cancel on the left, and bold when the other choice destroys data.
+    final ok = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: destructive,
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: !destructive,
+            isDestructiveAction: destructive,
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirm),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(

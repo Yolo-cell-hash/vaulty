@@ -1,6 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
 
+/// What the system unlock is called on this phone.
+enum Biometric {
+  faceId('Face ID'),
+  touchId('Touch ID'),
+  passcode('passcode');
+
+  const Biometric(this.label);
+
+  /// How iOS names it in sentences ("Unlock with Face ID").
+  final String label;
+}
+
 /// Face ID / Touch ID / fingerprint with device PIN fallback.
 class AuthService {
   AuthService._();
@@ -26,6 +38,17 @@ class AuthService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Face ID, Touch ID, or just the passcode when neither is set up. iOS
+  /// reports exactly one kind; Android copy stays generic.
+  static Future<Biometric> biometric() async {
+    try {
+      final types = await _auth.getAvailableBiometrics();
+      if (types.contains(BiometricType.face)) return Biometric.faceId;
+      if (types.contains(BiometricType.fingerprint)) return Biometric.touchId;
+    } catch (_) {}
+    return Biometric.passcode;
   }
 
   static Future<bool> authenticate(String reason) async {

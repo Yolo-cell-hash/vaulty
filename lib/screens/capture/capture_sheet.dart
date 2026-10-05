@@ -7,7 +7,9 @@ import '../../services/ocr_service.dart';
 import '../../services/personalization.dart';
 import '../../services/settings.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/adaptive.dart';
 import '../../widgets/common.dart';
+import '../../widgets/flow_sheet.dart';
 import '../../widgets/glyphs.dart';
 import '../memory_editor_screen.dart';
 import 'draft.dart';
@@ -15,7 +17,7 @@ import 'quick_capture_screen.dart';
 import 'scan_screen.dart';
 
 Future<void> showCaptureSheet(BuildContext context) {
-  return showModalBottomSheet<void>(context: context, isScrollControlled: true, builder: (_) => const _CaptureSheet());
+  return showVSheet<void>(context, (_) => const _CaptureSheet(), isScrollControlled: true);
 }
 
 class _CaptureSheet extends ConsumerWidget {
@@ -27,11 +29,19 @@ class _CaptureSheet extends ConsumerWidget {
     final templates = templatesFor(ref.watch(settingsProvider.select((s) => s.goals)));
     final nav = Navigator.of(context);
 
+    // Close this sheet, then open the task from the page underneath it.
+    void open(WidgetBuilder page) {
+      nav.pop();
+      presentFlow<void>(nav.context, page);
+    }
+
     Future<void> scan(ImageSource source) async {
       final file = await OcrService.pickImage(source);
-      nav.pop();
-      if (file == null) return;
-      nav.push(MaterialPageRoute(builder: (_) => ScanScreen(image: file)));
+      if (file == null) {
+        nav.pop();
+        return;
+      }
+      open((_) => ScanScreen(image: file));
     }
 
     return SafeArea(
@@ -50,10 +60,7 @@ class _CaptureSheet extends ConsumerWidget {
                   title: 'Type it',
                   subtitle: 'Say it naturally. Dates and details get picked up.',
                   glyph: G.pen,
-                  onTap: () {
-                    nav.pop();
-                    nav.push(MaterialPageRoute(builder: (_) => const QuickCaptureScreen()));
-                  },
+                  onTap: () => open((_) => const QuickCaptureScreen()),
                 ),
                 ListRow(
                   title: 'Scan a document',
@@ -80,23 +87,18 @@ class _CaptureSheet extends ConsumerWidget {
                   VChip(
                     label: t.label,
                     icon: t.recurrence == Recurrence.yearly ? G.cake : t.category.glyph,
-                    onTap: () {
-                      nav.pop();
-                      nav.push(
-                        MaterialPageRoute(
-                          builder: (_) => MemoryEditorScreen(
-                            initial: blankMemory(
-                              title: t.label,
-                              category: t.category,
-                              keys: t.keys,
-                              sensitive: t.sensitive,
-                              recurrence: t.recurrence,
-                            ),
-                            isNew: true,
-                          ),
+                    onTap: () => open(
+                      (_) => MemoryEditorScreen(
+                        initial: blankMemory(
+                          title: t.label,
+                          category: t.category,
+                          keys: t.keys,
+                          sensitive: t.sensitive,
+                          recurrence: t.recurrence,
                         ),
-                      );
-                    },
+                        isNew: true,
+                      ),
+                    ),
                   ),
               ],
             ),

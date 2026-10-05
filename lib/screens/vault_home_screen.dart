@@ -7,6 +7,7 @@ import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import '../widgets/flow_sheet.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/mascot.dart';
 import '../widgets/memory_cards.dart';
@@ -70,7 +71,7 @@ class _VaultHomeScreenState extends ConsumerState<VaultHomeScreen> {
           child: _Header(items: items, radar: radar, onSearch: widget.onOpenSearch, onMe: widget.onOpenMe),
         ),
         if (vault.isLoading && !vault.hasValue)
-          const SliverFillRemaining(child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+          const SliverFillRemaining(child: Center(child: Spinner()))
         else if (vault.hasError && !vault.hasValue)
           SliverFillRemaining(
             hasScrollBody: false,
@@ -291,8 +292,7 @@ class _EmptyVault extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Pressable(
-                onTap: () =>
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => QuickCaptureScreen(initialText: e))),
+                onTap: () => presentFlow<void>(context, (_) => QuickCaptureScreen(initialText: e)),
                 child: Row(
                   children: [
                     VIcon(G.arrowUpRight, size: 15, color: context.vc.inkFaint),

@@ -7,6 +7,7 @@ import '../data/memory_repository.dart';
 import '../data/vault_database.dart';
 import '../models/memory.dart';
 import '../services/attachment_store.dart';
+import '../services/auth_service.dart';
 import '../services/backup_service.dart';
 import '../services/notification_service.dart';
 import '../services/settings.dart';
@@ -206,6 +207,10 @@ final memoryByIdProvider = Provider.family<Memory?, String>((ref, id) {
 
 /// Whether the vault UI is currently unlocked.
 final unlockedProvider = NotifierProvider<UnlockNotifier, bool>(UnlockNotifier.new);
+
+/// Face ID or Touch ID, for iOS labels. Refreshed whenever the app resumes,
+/// in case it was set up in Settings meanwhile.
+final biometricProvider = FutureProvider<Biometric>((ref) => AuthService.biometric());
 
 class UnlockNotifier extends Notifier<bool> {
   @override

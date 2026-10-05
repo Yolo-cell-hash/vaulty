@@ -1,6 +1,6 @@
 import 'package:file_picker/file_picker.dart' show FilePicker, FileType;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -9,9 +9,11 @@ import '../services/backup_service.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive.dart';
 import '../widgets/common.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/mascot.dart';
+import '../widgets/nav_bar.dart';
 
 class BackupScreen extends ConsumerStatefulWidget {
   const BackupScreen({super.key});
@@ -55,7 +57,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
         ),
       );
       if (saved == null) return;
-      HapticFeedback.mediumImpact();
+      Haptics.success();
       await ref.read(settingsProvider.notifier).change((s) => s.copyWith(lastBackup: DateTime.now()));
       toast('Backup saved. Keep the passphrase somewhere safe.', icon: G.shield);
     } on Object catch (e) {
@@ -82,7 +84,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       try {
         contents = await _working('Unlocking backup', () => VaultBackup.open(bytes, passphrase));
       } on BackupException catch (e) {
-        HapticFeedback.heavyImpact();
+        Haptics.error();
         if (!e.message.startsWith('Wrong')) {
           toast(e.message, icon: G.warning);
           return;
@@ -106,24 +108,43 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     try {
       final summary = await _working('Restoring', () => ref.read(vaultProvider.notifier).restore(found));
       if (!mounted) return;
-      HapticFeedback.mediumImpact();
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          icon: const Mascot(size: 84, mood: MascotMood.grin, prop: MascotProp.check, animate: false),
-          title: const Text('Welcome back', textAlign: TextAlign.center),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _SummaryRow(label: 'Added', value: summary.added),
-              _SummaryRow(label: 'Updated', value: summary.updated),
-              _SummaryRow(label: 'Kept (yours were newer)', value: summary.skipped),
-            ],
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          actions: [VButton(label: 'Done', height: 48, onPressed: () => Navigator.pop(ctx))],
-        ),
-      );
+      Haptics.success();
+      final rows = [
+        _SummaryRow(label: 'Added', value: summary.added),
+        _SummaryRow(label: 'Updated', value: summary.updated),
+        _SummaryRow(label: 'Kept (yours were newer)', value: summary.skipped),
+      ];
+      await (context.isCupertino
+          ? showCupertinoDialog<void>(
+              context: context,
+              builder: (ctx) => CupertinoAlertDialog(
+                title: const Text('Welcome back'),
+                content: Column(
+                  children: [
+                    const Mascot(size: 72, mood: MascotMood.grin, prop: MascotProp.check, animate: false),
+                    const SizedBox(height: 8),
+                    ...rows,
+                  ],
+                ),
+                actions: [
+                  CupertinoDialogAction(
+                    isDefaultAction: true,
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+            )
+          : showDialog<void>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                icon: const Mascot(size: 84, mood: MascotMood.grin, prop: MascotProp.check, animate: false),
+                title: const Text('Welcome back', textAlign: TextAlign.center),
+                content: Column(mainAxisSize: MainAxisSize.min, children: rows),
+                actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                actions: [VButton(label: 'Done', height: 48, onPressed: () => Navigator.pop(ctx))],
+              ),
+            ));
     } on Object catch (e) {
       toast('Restore failed: $e', icon: G.warning);
     }
@@ -140,8 +161,10 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       child: Stack(
         children: [
           Scaffold(
-            appBar: AppBar(
+            appBar: vAppBar(
+              context,
               leading: VIconButton(G.chevronLeft, label: 'Back', onTap: () => Navigator.pop(context)),
+              largeTitle: 'Backup',
             ),
             body: ListView(
               padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 40),
@@ -243,7 +266,10 @@ class _SummaryRow extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(
       children: [
-        Expanded(child: Text(label, style: context.type.body)),
+        // In an iOS alert, the alert's own type; in the Material dialog, ours.
+        Expanded(
+          child: Text(label, textAlign: TextAlign.start, style: context.isCupertino ? null : context.type.body),
+        ),
         Text('$value', style: context.type.mono(15)),
       ],
     ),
@@ -268,10 +294,13 @@ class _BusyOverlay extends StatelessWidget {
             const SizedBox(height: 18),
             Text(label, style: context.type.headline.copyWith(fontSize: 24)),
             const SizedBox(height: 16),
-            SizedBox(
-              width: 140,
-              child: LinearProgressIndicator(minHeight: 2, color: c.ink, backgroundColor: c.line),
-            ),
+            if (context.isCupertino)
+              const Spinner()
+            else
+              SizedBox(
+                width: 140,
+                child: LinearProgressIndicator(minHeight: 2, color: c.ink, backgroundColor: c.line),
+              ),
           ],
         ),
       ),
@@ -281,10 +310,10 @@ class _BusyOverlay extends StatelessWidget {
 
 /// Asks for a passphrase; when [creating], asks twice and shows strength.
 Future<String?> _askPassphrase(BuildContext context, {required bool creating, String error = ''}) {
-  return showModalBottomSheet<String>(
-    context: context,
+  return showVSheet<String>(
+    context,
+    (_) => _PassphraseSheet(creating: creating, error: error),
     isScrollControlled: true,
-    builder: (_) => _PassphraseSheet(creating: creating, error: error),
   );
 }
 

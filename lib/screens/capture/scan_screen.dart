@@ -11,6 +11,7 @@ import '../../services/smart_parser.dart';
 import '../../state/vault_state.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
+import '../../widgets/flow_sheet.dart';
 import '../../widgets/glyphs.dart';
 import '../memory_editor_screen.dart';
 import 'draft.dart';
@@ -79,7 +80,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final c = context.vc;
     return Scaffold(
       appBar: AppBar(
-        leading: VIconButton(G.chevronLeft, label: 'Back', onTap: () => Navigator.pop(context)),
+        // On iOS this is the first page of a sheet, which closes rather than goes back.
+        leading: context.isCupertino
+            ? VIconButton(G.close, label: 'Close', onTap: () => closeFlow(context))
+            : VIconButton(G.chevronLeft, label: 'Back', onTap: () => closeFlow(context)),
         title: const Text('Scan'),
       ),
       body: SafeArea(
@@ -119,7 +123,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   ),
                 ),
                 const Spacer(),
-                VButton(label: 'Go back', onPressed: () => Navigator.of(context).pop()),
+                VButton(label: 'Go back', onPressed: () => closeFlow(context)),
               ] else ...[
                 Text('Reading your photo', style: context.type.headline),
                 const SizedBox(height: 20),
@@ -135,7 +139,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                             child: i < _stage
                                 ? VIcon(G.check, key: const ValueKey('done'), size: 20, color: c.ok, stroke: 2.2)
                                 : i == _stage
-                                ? CircularProgressIndicator(key: const ValueKey('run'), strokeWidth: 2, color: c.ink)
+                                ? Spinner(key: const ValueKey('run'), size: 22, color: c.ink)
                                 : Container(
                                     key: const ValueKey('wait'),
                                     margin: const EdgeInsets.all(7),
