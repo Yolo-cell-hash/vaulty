@@ -108,7 +108,7 @@ class _FloatingNav extends StatelessWidget {
     return MediaQuery.withClampedTextScaling(
       maxScaleFactor: 1.15,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(Space.page, 0, Space.page, bottom + 12),
+        padding: context.pageInsets + EdgeInsets.fromLTRB(Space.page, 0, Space.page, bottom + 12),
         child: Row(
           children: [
             Expanded(

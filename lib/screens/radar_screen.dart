@@ -27,7 +27,7 @@ class RadarScreen extends ConsumerWidget {
     ];
     final urgent = groups[0].$2.length + groups[1].$2.length;
 
-    return CustomScrollView(
+    return PageScrollView(
       slivers: [
         SliverToBoxAdapter(
           child: SafeArea(

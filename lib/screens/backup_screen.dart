@@ -167,7 +167,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
               largeTitle: 'Backup',
             ),
             body: ListView(
-              padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 40),
+              padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 40),
               children: [
                 Text('Backup', style: context.type.display),
                 const SizedBox(height: 8),

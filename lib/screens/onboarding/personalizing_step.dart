@@ -81,7 +81,7 @@ class _PersonalizingStepState extends State<PersonalizingStep> with TickerProvid
     final done = _active >= _labels.length;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(Space.page, 24, Space.page, Space.l),
+        padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 24, Space.page, Space.l),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

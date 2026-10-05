@@ -94,7 +94,7 @@ class _TagScreenState extends ConsumerState<TagScreen> {
       body: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.only(bottom: 140),
+            padding: context.pageInsets + const EdgeInsets.only(bottom: 140),
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 0),
@@ -147,8 +147,8 @@ class _TagScreenState extends ConsumerState<TagScreen> {
             ],
           ),
           Positioned(
-            left: Space.page,
-            right: Space.page,
+            left: Space.page + context.pageInset,
+            right: Space.page + context.pageInset,
             bottom: MediaQuery.paddingOf(context).bottom + 16,
             child: VButton(
               label: tag.isPerson ? 'Add something for ${tag.name}' : 'Add to ${tag.label}',
@@ -258,7 +258,7 @@ class ManageTagsScreen extends ConsumerWidget {
         largeTitle: 'People & tags',
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 40),
+        padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 40),
         children: [
           Text('People & tags', style: context.type.display.copyWith(fontSize: 36)),
           const SizedBox(height: 6),

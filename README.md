@@ -68,8 +68,9 @@ flutter pub get
 flutter run
 ```
 
-- **Android**: minSdk 24. Release builds declare no `INTERNET` permission. R8 keep rules are in
-  `android/app/proguard-rules.pro`.
+- **Android**: minSdk 24; targetSdk is Flutter's default (36 on 3.44). Release builds declare no `INTERNET` permission. R8 keep rules are in
+  `android/app/proguard-rules.pro`. Phones run in portrait. Tablets, foldables and ChromeOS rotate and resize, and
+  content keeps to a centred 600dp column (see [DESIGN.md](DESIGN.md)).
 - **iOS**: iPhone only, portrait. iPads run it in iPhone compatibility mode (see [DESIGN.md](DESIGN.md)).
   Deployment target 15.5 (required by ML Kit). Build on macOS with Xcode. On a Mac, run
   `cd ios && pod install` the first time.
