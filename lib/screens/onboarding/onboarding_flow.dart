@@ -145,18 +145,34 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
 
   /// Common frame: progress rule, scrollable body, pinned actions.
   Widget _frame({required List<Widget> body, required List<Widget> actions, bool progress = true}) {
+    // All of it keeps to the page column, but the body scrolls from anywhere.
+    final sides = context.pageInsets + const EdgeInsets.symmetric(horizontal: Space.page);
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(Space.page, 8, Space.page, Space.l),
+        padding: const EdgeInsets.only(top: 8, bottom: Space.l),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (progress)
-              StepProgress(step: _step - _firstCounted + 1, total: _lastCounted - _firstCounted + 1, onBack: _back),
+              Padding(
+                padding: sides,
+                child: StepProgress(
+                  step: _step - _firstCounted + 1,
+                  total: _lastCounted - _firstCounted + 1,
+                  onBack: _back,
+                ),
+              ),
             Expanded(
-              child: ListView(padding: const EdgeInsets.only(top: 28, bottom: 16), children: body),
+              child: ListView(padding: sides + const EdgeInsets.only(top: 28, bottom: 16), children: body),
             ),
-            ...actions,
+            Padding(
+              padding: sides,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: actions,
+              ),
+            ),
           ],
         ),
       ),
@@ -168,7 +184,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   Widget _welcome() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(Space.page, 16, Space.page, Space.l),
+        padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 16, Space.page, Space.l),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -85,7 +85,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen> {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(Space.page, 0, Space.page, 20),
+                padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 0, Space.page, 20),
                 children: [
                   Text.rich(
                     TextSpan(
@@ -129,7 +129,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(Space.page, 0, Space.page, 12),
+              padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 0, Space.page, 12),
               child: Row(
                 children: [
                   Expanded(

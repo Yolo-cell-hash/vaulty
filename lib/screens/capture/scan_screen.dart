@@ -88,7 +88,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.page, 8, Space.page, Space.l),
+          padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 8, Space.page, Space.l),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

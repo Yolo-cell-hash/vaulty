@@ -65,7 +65,7 @@ class _VaultHomeScreenState extends ConsumerState<VaultHomeScreen> {
     ];
     final bank = items.where(filters[active].test).toList();
 
-    return CustomScrollView(
+    return PageScrollView(
       slivers: [
         SliverToBoxAdapter(
           child: _Header(items: items, radar: radar, onSearch: widget.onOpenSearch, onMe: widget.onOpenMe),

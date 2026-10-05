@@ -222,7 +222,7 @@ class _MemoryEditorScreenState extends ConsumerState<MemoryEditorScreen> {
                 Expanded(
                   child: ListView(
                     keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 24),
+                    padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 24),
                     children: [
                       if (widget.notice != null) ...[
                         VCard(
@@ -311,7 +311,7 @@ class _MemoryEditorScreenState extends ConsumerState<MemoryEditorScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(Space.page, 8, Space.page, 12),
+                  padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 8, Space.page, 12),
                   child: VButton(
                     label: widget.isNew ? 'Save to vault' : 'Save changes',
                     busy: _saving,

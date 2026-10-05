@@ -64,7 +64,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
       color: c.bg,
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.page, 16, Space.page, Space.l),
+          padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 16, Space.page, Space.l),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

@@ -39,7 +39,8 @@ class MeScreen extends ConsumerWidget {
     void push(Widget page) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(Space.page, MediaQuery.paddingOf(context).top + 20, Space.page, 140),
+      padding:
+          context.pageInsets + EdgeInsets.fromLTRB(Space.page, MediaQuery.paddingOf(context).top + 20, Space.page, 140),
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,7 +384,7 @@ class _ArchivedScreen extends ConsumerWidget {
         largeTitle: 'Archived',
       ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 40),
+        padding: context.pageInsets + const EdgeInsets.only(bottom: 40),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 20),

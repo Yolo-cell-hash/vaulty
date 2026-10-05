@@ -157,7 +157,7 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(Space.page, 8, Space.page, 48),
+        padding: context.pageInsets + const EdgeInsets.fromLTRB(Space.page, 8, Space.page, 48),
         children: [
           Row(
             children: [

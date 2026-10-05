@@ -243,11 +243,28 @@ extension VaultyThemeX on BuildContext {
   /// True on iOS, where system pieces (dialogs, pickers, menus, sheets) take
   /// the platform's own form. The brand layer looks the same everywhere.
   bool get isCupertino => Theme.of(this).platform == TargetPlatform.iOS;
+
+  /// Space each side of the page column: none on a phone, and enough on a
+  /// wider window (tablet, unfolded foldable, ChromeOS) to centre a
+  /// [Space.column]-wide column, so the phone layout keeps its proportions.
+  double get pageInset {
+    final width = MediaQuery.sizeOf(this).width;
+    return width > Space.column ? (width - Space.column) / 2 : 0;
+  }
+
+  /// [pageInset] as padding. Scroll views add it to their own padding so
+  /// they still scroll from anywhere in the window; fixed layouts and pinned
+  /// bars pad by it. Paper and app bars keep running edge to edge.
+  EdgeInsets get pageInsets => EdgeInsets.symmetric(horizontal: pageInset);
 }
 
 /// Spacing & radius scale. Stick to these.
 class Space {
   static const xs = 4.0, s = 8.0, m = 12.0, l = 16.0, xl = 24.0, xxl = 32.0, page = 20.0;
+
+  /// Widest the page column gets, gutters included. Sheets and the nav
+  /// capsule keep to it too.
+  static const column = 600.0;
 }
 
 class Radii {
@@ -338,6 +355,8 @@ class AppTheme {
             ? null
             : (brightness == Brightness.dark ? const Color(0x7A000000) : const Color(0x33000000)),
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.xl))),
+        // Lines up with the page column on wide windows.
+        constraints: const BoxConstraints(maxWidth: Space.column),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: c.surface,

@@ -271,6 +271,23 @@ class VIconButton extends StatelessWidget {
   }
 }
 
+// ----------------------------------------------------------------- layout --
+
+/// A [CustomScrollView] whose slivers keep to the page column (see
+/// [VaultyThemeX.pageInset]) while the scrolling itself spans the window, so
+/// a thumb on the edge of a tablet still moves the page.
+class PageScrollView extends CustomScrollView {
+  const PageScrollView({super.key, super.keyboardDismissBehavior, super.slivers});
+
+  @override
+  List<Widget> buildSlivers(BuildContext context) {
+    // Padded even when the inset is zero, so resizing a window across the
+    // column width keeps the slivers' state.
+    final insets = context.pageInsets;
+    return [for (final s in slivers) SliverPadding(padding: insets, sliver: s)];
+  }
+}
+
 // --------------------------------------------------------------- surfaces --
 
 /// Flat surface with a hairline. No drop shadows anywhere in the app.
@@ -807,10 +824,14 @@ Toast toaster(BuildContext context) {
   }
   final c = context.vc;
   final m = ScaffoldMessenger.of(context);
+  // On a wide window the snackbar keeps to the page column (the theme's 16pt
+  // insets either side of it).
+  final width = context.pageInset > 0 ? Space.column - 2 * Space.l : null;
   return (String message, {G icon = G.check, ToastAction? action}) {
     m.hideCurrentSnackBar();
     m.showSnackBar(
       SnackBar(
+        width: width,
         content: Row(
           children: [
             VIcon(icon, size: 18, color: c.acid, stroke: 2),

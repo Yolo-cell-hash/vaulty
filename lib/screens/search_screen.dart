@@ -102,7 +102,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return GestureDetector(
       onTap: () => _focus.unfocus(),
       behavior: HitTestBehavior.translucent,
-      child: CustomScrollView(
+      child: PageScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         slivers: [
           SliverToBoxAdapter(

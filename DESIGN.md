@@ -70,10 +70,17 @@ never for anything lighter. If you retune a token, re-run the contrast check bef
 ## Spacing, shape and motion
 
 - Spacing scale is 4, 8, 12, 16, 24, 32. Page gutter is 20.
-- Layouts are for phone widths: one portrait column. iOS ships iPhone-only, so iPads run the app in iPhone
-  compatibility mode. Before adding the iPad family back, give pages, sheets and the nav capsule a readable
-  max width and support every orientation on iPad, because a build that ships with iPad support can't drop
-  it in a later update.
+- Layouts are drawn for phone widths: one column. On anything wider (Android tablets, unfolded foldables,
+  ChromeOS, a wide split-screen window) the page column stays centred and at most 600 wide (`Space.column`),
+  while the paper, app bars and scrolling still run edge to edge. Scroll views add `context.pageInsets` to their
+  padding (`PageScrollView` for sliver pages), so a thumb on the edge of a tablet still scrolls. Fixed layouts and
+  pinned bars pad by it too. Bottom sheets, snackbars and the nav capsule keep to the same column.
+- Phones stay in portrait. Screens 600dp or more on their shortest side turn freely: Android 16 ignores the
+  portrait lock there for apps targeting SDK 36, and SDK 37 removes the opt-out. Check new screens in landscape
+  on a tablet and an unfolded foldable.
+- iOS ships iPhone-only, so iPads run the app in iPhone compatibility mode. Before adding the iPad family back,
+  give the iOS-only pieces (flow sheets, wheel panels) the same column and support every orientation on iPad,
+  because a build that ships with iPad support can't drop it in a later update.
 - Radii are 10, 14, 20 and 28. Buttons and chips are full pills.
 - Press feedback is a 0.97 scale plus a selection haptic (on iOS, plain taps stay silent and list rows shade
   instead; see [iOS and Android](#ios-and-android)). Springs use `easeOutBack` on **scale only**, never on
