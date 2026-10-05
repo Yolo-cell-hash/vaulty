@@ -71,8 +71,9 @@ never for anything lighter. If you retune a token, re-run the contrast check bef
 
 - Spacing scale is 4, 8, 12, 16, 24, 32. Page gutter is 20.
 - Radii are 10, 14, 20 and 28. Buttons and chips are full pills.
-- Press feedback is a 0.97 scale plus a selection haptic. Springs use `easeOutBack` on **scale only**,
-  never on size, because overshooting a size produces negative constraints.
+- Press feedback is a 0.97 scale plus a selection haptic (on iOS, plain taps stay silent and list rows shade
+  instead; see [iOS and Android](#ios-and-android)). Springs use `easeOutBack` on **scale only**, never on
+  size, because overshooting a size produces negative constraints.
 - The floating ink capsule nav with a lime **+** is the signature Gen-Z element.
 - **Launch:** the native splash shows Vo centred on `bg`, and `SplashIntro` continues from that exact frame.
   It is the app's one choreographed delight moment, so keep it under 2 s and skippable.
@@ -87,10 +88,49 @@ next to its neighbours to check its weight.
 
 `VButton` (ink / brand / outline / ghost / danger) · `VIconButton` · `VCard` · `Hairline` · `Eyebrow` ·
 `SectionHeader` · `CountdownTag` · `CategoryLabel` · `Monogram` · `UnderlineTabs` · `VChip` ·
-`ListGroup` / `ListRow` · `EmptyState` · `toaster` / `showToast` · `confirmDialog` · `Wordmark`
+`ListGroup` / `ListRow` · `EmptyState` · `Spinner` · `toaster` / `showToast` · `confirmDialog` · `Wordmark`
 
 Memory UI lives in `lib/widgets/memory_cards.dart`: `HeroCard`, `DateBlock`, `MemoryRow`, `MemoryList`,
 `FactCard` and `MemoryGrid`.
+
+## iOS and Android
+
+The brand layer is the same on both: type, colour, glyphs, Vo, the capsule nav, pill buttons and hairline
+cards. The **system pieces** take each platform's own form, the way a native app's would, and they're set in
+the system font (SF on iOS). iOS components pick up brand violet as their tint.
+
+| Piece | Android | iOS |
+|---|---|---|
+| Confirmations | Material dialog, pill buttons | Alert, Cancel on the left (bold when the other choice destroys data) |
+| Rename, edit name | Bottom sheet with a field | Alert with a text field, like renaming an album in Photos |
+| "More" (…) | Sheet of rows | Pull-down menu anchored to the button |
+| Photo source | Sheet of rows | Action sheet with Cancel |
+| Date and time | Material calendar and clock | Wheels in a panel with Cancel and Done |
+| Capture, scan, edit | Pushed page | Sheet that stacks the page behind it as a card; swipe down to close, held while there are unsaved changes |
+| Short tasks (reminders, renew, tags, passphrase) | Bottom sheet | Bottom sheet with the iOS grabber and dim, over everything |
+| Toasts | Snackbar above the nav | Capsule that drops in from the top; swipe it up |
+| Radar row swipes | Swipe to renew or archive | Swipe actions: partway reveals a button, all the way fires it |
+| Switches, spinners, theme picker | Material | Native switch, activity indicator, sliding segmented control |
+| List rows | Shrink slightly on press | Shade while pressed, like a table cell |
+| Page bars | Plain | Hairline once content scrolls under; the serif title moves into the bar when it scrolls away |
+| Tabs | Header scrolls away | Frosted bar with an inline title under the status bar once the header scrolls away |
+| Haptics | Selection tick on every tap; medium/heavy impacts | Ticks only on selection controls; success/error notification haptics |
+| Unlock wording | Fingerprint or PIN | Face ID, Touch ID or passcode, whichever the phone has |
+
+Both: tapping the status bar (iOS) or the open tab again scrolls back to the top, and the status bar follows the
+app's theme rather than the system's. iOS also gets scroll indicators, and photos can be dragged away to close.
+
+When building UI, use the helpers rather than the Material calls, so both platforms stay right:
+
+- `context.isCupertino` (`lib/theme/app_theme.dart`) for the rare platform branch.
+- `lib/widgets/adaptive.dart`: `showVSheet`, `pickDate`, `pickTime`, `showTextAlert`, `showActionSheet`,
+  `MenuButton`, and `Haptics.success()` / `Haptics.error()`.
+- `lib/widgets/flow_sheet.dart`: open a task with `presentFlow`, leave it with `closeFlow` (never
+  `Navigator.pop`, which would close only the current step on iOS), and wrap editors in `DismissGuard`.
+- `lib/widgets/nav_bar.dart`: `vAppBar` for pushed pages (pass `largeTitle` when the page opens with a serif
+  title) and `ScrollEdgeBar` for tabs.
+- `lib/widgets/swipe_actions.dart`: iOS row swipe actions.
+- `Pressable(highlight: true)` for list rows, `showToast` with a `ToastAction` for Undo.
 
 ## Sources
 

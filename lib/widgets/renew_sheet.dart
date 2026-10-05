@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../models/memory.dart';
 import '../theme/app_theme.dart';
+import 'adaptive.dart';
 import 'common.dart';
 import 'glyphs.dart';
 
@@ -49,11 +49,7 @@ RenewOption suggestedRenewal(Memory m) {
 
 /// "Renewed it!": pick the new expiry with one tap. Returns the new date.
 Future<DateTime?> showRenewSheet(BuildContext context, Memory memory) {
-  return showModalBottomSheet<DateTime>(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => _RenewSheet(memory: memory),
-  );
+  return showVSheet<DateTime>(context, (_) => _RenewSheet(memory: memory), isScrollControlled: true);
 }
 
 class _RenewSheet extends StatefulWidget {
@@ -79,12 +75,12 @@ class _RenewSheetState extends State<_RenewSheet> {
 
   Future<void> _pick() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: now,
-      lastDate: DateTime(now.year + 50),
-      helpText: 'New expiry date',
+    final picked = await pickDate(
+      context,
+      initial: _date,
+      first: now,
+      last: DateTime(now.year + 50),
+      title: 'New expiry date',
     );
     if (picked != null) {
       setState(() {
@@ -163,7 +159,7 @@ class _RenewSheetState extends State<_RenewSheet> {
                 onPressed: days < 0
                     ? null
                     : () {
-                        HapticFeedback.mediumImpact();
+                        Haptics.success();
                         Navigator.pop(context, _date);
                       },
               ),

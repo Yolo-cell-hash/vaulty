@@ -45,7 +45,8 @@ lib/
   services/      parser, OCR, notifications, auth, secure keys, encrypted attachments, settings
   state/         Riverpod providers
   screens/       onboarding, home, radar, search, me, capture, editor, detail, lock
-  widgets/       mascot (drawn in code), cards, shared UI kit
+  widgets/       mascot (drawn in code), cards, shared UI kit, iOS/Android system pieces (adaptive,
+                 flow_sheet, nav_bar, swipe_actions)
   theme/         design tokens: paper/ink palette, type scale, spacing (see DESIGN.md)
   widgets/glyphs.dart   Vaulty Glyphs, the app's own icon set
 assets/fonts/    Instrument Serif + Instrument Sans + DM Mono (bundled, OFL; no runtime downloads)
@@ -55,6 +56,10 @@ assets/fonts/    Instrument Serif + Instrument Sans + DM Mono (bundled, OFL; no 
 
 The UI follows the "Editorial Vault" system in [DESIGN.md](DESIGN.md): serif display type, paper and ink,
 one violet brand colour, a lime accent, custom glyph icons, and no emoji, gradients or drop shadows.
+
+The brand looks the same on both platforms, but system pieces take each platform's own form: on iOS that means
+alerts, action sheets, pull-down menus, date wheels, stacked sheets for capture and editing, swipe actions, top
+toasts and iOS haptics. [DESIGN.md](DESIGN.md#ios-and-android) has the full list.
 
 ## Running
 
@@ -67,12 +72,15 @@ flutter run
   `android/app/proguard-rules.pro`.
 - **iOS**: deployment target 15.5 (required by ML Kit). Build on macOS with Xcode. On a Mac, run
   `cd ios && pod install` the first time.
+- Both need Flutter 3.44 or newer (Dart 3.12), as set in `pubspec.yaml`.
 
 ## App icon
 
 "Peekaboo" Vo. The sources in `assets/icon/` are rendered from the mascot painter:
 
-- iOS: a full-bleed master.
+- iOS: a full-bleed master, plus iOS 18 dark (`icon_ios_dark.png`, Vo on transparency over the system's dark
+  backdrop) and tinted (`icon_ios_tinted.png`, a grayscale silhouette) variants. Both are the Android
+  foreground and monochrome layers scaled 1.5x about the centre, which is the master's composition.
 - Android: an adaptive foreground on the full 108dp canvas, plus a monochrome layer for themed icons.
 - Notifications: `ic_stat_vaulty`, a white silhouette.
 
@@ -108,6 +116,8 @@ flutter test
 iOS 64-pending cap.
 `test/database_test.dart` runs the schema migrations on desktop SQLite (`sqflite_common_ffi`): a v1
 database upgrades without data loss, migrations are safe to re-run, and soft delete/undo/purge behave.
+`test/adaptive_test.dart` checks that each platform gets its own dialogs, pickers, toasts, menus and sheets, that
+a flow sheet closes whole and holds unsaved changes, and that swipe actions fire.
 
 ## Database upgrades
 

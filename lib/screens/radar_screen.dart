@@ -10,6 +10,7 @@ import '../widgets/glyphs.dart';
 import '../widgets/mascot.dart';
 import '../widgets/memory_cards.dart';
 import '../widgets/renew_sheet.dart';
+import '../widgets/swipe_actions.dart';
 
 class RadarScreen extends ConsumerWidget {
   const RadarScreen({super.key});
@@ -126,10 +127,47 @@ class _SwipeToArchive extends ConsumerWidget {
   final Memory memory;
   final Widget child;
 
+  Future<void> _renew(BuildContext context, WidgetRef ref) async {
+    final toast = toaster(context);
+    final date = await showRenewSheet(context, memory);
+    if (date != null) {
+      await ref.read(vaultProvider.notifier).renew(memory, date);
+      toast('Renewed until ${dateFmt.format(date)}');
+    }
+  }
+
+  Future<void> _archive(BuildContext context, WidgetRef ref) async {
+    final toast = toaster(context);
+    final notifier = ref.read(vaultProvider.notifier);
+    await notifier.setArchived(memory.id, true);
+    toast(
+      'Archived “${memory.title}”',
+      icon: G.archive,
+      action: ToastAction('Undo', () => notifier.setArchived(memory.id, false)),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.vc;
     final renewable = !memory.isRecurring;
+    if (context.isCupertino) {
+      // iOS rows reveal buttons: tap one, or swipe all the way through.
+      return SwipeActions(
+        key: ValueKey('radar-${memory.id}'),
+        leading: !renewable
+            ? null
+            : SwipeAction(label: 'Renewed', glyph: G.repeat, color: c.ok, onTrigger: () => _renew(context, ref)),
+        trailing: SwipeAction(
+          label: 'Archive',
+          glyph: G.archive,
+          color: c.brand,
+          removes: true,
+          onTrigger: () => _archive(context, ref),
+        ),
+        child: child,
+      );
+    }
     return Dismissible(
       key: ValueKey('radar-${memory.id}'),
       direction: renewable ? DismissDirection.horizontal : DismissDirection.endToStart,
@@ -171,22 +209,10 @@ class _SwipeToArchive extends ConsumerWidget {
       confirmDismiss: (direction) async {
         HapticFeedback.mediumImpact();
         if (direction == DismissDirection.startToEnd) {
-          final toast = toaster(context);
-          final date = await showRenewSheet(context, memory);
-          if (date != null) {
-            await ref.read(vaultProvider.notifier).renew(memory, date);
-            toast('Renewed until ${dateFmt.format(date)}');
-          }
+          await _renew(context, ref);
           return false; // The row stays; it just moves to its new slot.
         }
-        final toast = toaster(context);
-        final notifier = ref.read(vaultProvider.notifier);
-        await notifier.setArchived(memory.id, true);
-        toast(
-          'Archived “${memory.title}”',
-          icon: G.archive,
-          action: SnackBarAction(label: 'Undo', onPressed: () => notifier.setArchived(memory.id, false)),
-        );
+        await _archive(context, ref);
         return true;
       },
       child: child,

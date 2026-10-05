@@ -9,8 +9,10 @@ import '../services/ocr_service.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive.dart';
 import '../widgets/common.dart';
 import '../widgets/encrypted_image.dart';
+import '../widgets/flow_sheet.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/memory_cards.dart';
 import '../widgets/reminder_sheet.dart';
@@ -84,9 +86,11 @@ class _MemoryEditorScreenState extends ConsumerState<MemoryEditorScreen> {
     if (!_dirty) setState(() => _dirty = true);
   }
 
+  /// Something here would be lost by closing: an edit, or a new item's photos.
+  bool get _unsaved => _dirty || (widget.isNew && _attachments.isNotEmpty);
+
   Future<bool> _confirmDiscard() async {
-    if (!_dirty && !widget.isNew) return true;
-    if (!_dirty && widget.isNew && _attachments.isEmpty) return true;
+    if (!_unsaved) return true;
     final ok = await confirmDialog(
       context,
       title: 'Discard changes?',
@@ -104,12 +108,12 @@ class _MemoryEditorScreenState extends ConsumerState<MemoryEditorScreen> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _expiry ?? now.add(const Duration(days: 30)),
-      firstDate: DateTime(now.year - 100),
-      lastDate: DateTime(now.year + 50),
-      helpText: 'Pick a date',
+    final picked = await pickDate(
+      context,
+      initial: _expiry ?? now.add(const Duration(days: 30)),
+      first: DateTime(now.year - 100),
+      last: DateTime(now.year + 50),
+      title: 'Pick a date',
     );
     if (picked != null) {
       HapticFeedback.selectionClick();
@@ -119,24 +123,29 @@ class _MemoryEditorScreenState extends ConsumerState<MemoryEditorScreen> {
   }
 
   Future<void> _addPhoto() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.l, 0, Space.l, Space.l),
-          child: ListGroup(
-            children: [
-              ListRow(title: 'Take a photo', glyph: G.scan, onTap: () => Navigator.pop(ctx, ImageSource.camera)),
-              ListRow(
-                title: 'Choose from library',
-                glyph: G.image,
-                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+    final source = context.isCupertino
+        ? await showActionSheet<ImageSource>(context, [
+            ('Take a photo', ImageSource.camera),
+            ('Choose from library', ImageSource.gallery),
+          ])
+        : await showModalBottomSheet<ImageSource>(
+            context: context,
+            builder: (ctx) => SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(Space.l, 0, Space.l, Space.l),
+                child: ListGroup(
+                  children: [
+                    ListRow(title: 'Take a photo', glyph: G.scan, onTap: () => Navigator.pop(ctx, ImageSource.camera)),
+                    ListRow(
+                      title: 'Choose from library',
+                      glyph: G.image,
+                      onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
+            ),
+          );
     if (source == null) return;
     final file = await OcrService.pickImage(source);
     if (file == null) return;
@@ -185,9 +194,9 @@ class _MemoryEditorScreenState extends ConsumerState<MemoryEditorScreen> {
       await AttachmentStore.remove(a);
     }
     if (!mounted) return;
-    HapticFeedback.mediumImpact();
+    Haptics.success();
     final toast = toaster(context);
-    Navigator.of(context).pop();
+    closeFlow(context);
     toast(widget.isNew ? 'Saved “$title”' : 'Updated “$title”');
   }
 
@@ -198,113 +207,119 @@ class _MemoryEditorScreenState extends ConsumerState<MemoryEditorScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        final nav = Navigator.of(context);
-        if (await _confirmDiscard()) nav.pop();
+        if (await _confirmDiscard() && context.mounted) closeFlow(context);
       },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: VIconButton(G.close, label: 'Close', onTap: () => Navigator.of(context).maybePop()),
-          title: Text(widget.isNew ? 'New memory' : 'Edit'),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 24),
-                  children: [
-                    if (widget.notice != null) ...[
-                      VCard(
-                        color: c.warnSoft,
-                        child: Row(
-                          children: [
-                            VIcon(G.info, size: 18, color: c.warn),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(widget.notice!, style: context.type.body)),
-                          ],
+      child: DismissGuard(
+        locked: _unsaved,
+        child: Scaffold(
+          appBar: AppBar(
+            leading: VIconButton(G.close, label: 'Close', onTap: () => Navigator.of(context).maybePop()),
+            title: Text(widget.isNew ? 'New memory' : 'Edit'),
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(Space.page, 4, Space.page, 24),
+                    children: [
+                      if (widget.notice != null) ...[
+                        VCard(
+                          color: c.warnSoft,
+                          child: Row(
+                            children: [
+                              VIcon(G.info, size: 18, color: c.warn),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text(widget.notice!, style: context.type.body)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      TextField(
+                        controller: _title,
+                        onChanged: (_) => _touch(),
+                        textCapitalization: TextCapitalization.sentences,
+                        style: context.type.headline.copyWith(fontSize: 32),
+                        maxLines: null,
+                        decoration: InputDecoration(
+                          hintText: 'What is it?',
+                          hintStyle: context.type.headline.copyWith(fontSize: 32, color: c.inkFaint),
+                          filled: false,
+                          contentPadding: EdgeInsets.zero,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                    ],
-                    TextField(
-                      controller: _title,
-                      onChanged: (_) => _touch(),
-                      textCapitalization: TextCapitalization.sentences,
-                      style: context.type.headline.copyWith(fontSize: 32),
-                      maxLines: null,
-                      decoration: InputDecoration(
-                        hintText: 'What is it?',
-                        hintStyle: context.type.headline.copyWith(fontSize: 32, color: c.inkFaint),
-                        filled: false,
-                        contentPadding: EdgeInsets.zero,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
+                      const SizedBox(height: 22),
+                      const _Label('Type'),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final cat in MemoryCategory.values)
+                            VChip(
+                              label: cat.label,
+                              icon: cat.glyph,
+                              selected: cat == _category,
+                              onTap: () {
+                                setState(() => _category = cat);
+                                _touch();
+                              },
+                            ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 22),
-                    const _Label('Type'),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final cat in MemoryCategory.values)
-                          VChip(
-                            label: cat.label,
-                            icon: cat.glyph,
-                            selected: cat == _category,
-                            onTap: () {
-                              setState(() => _category = cat);
+                      const _Label('Who & tags'),
+                      _tagsSection(),
+                      const _Label('Date'),
+                      _dateSection(),
+                      const _Label('Details'),
+                      _detailsSection(),
+                      const _Label('Photos'),
+                      _photos(),
+                      const _Label('Notes'),
+                      TextField(
+                        controller: _notes,
+                        onChanged: (_) => _touch(),
+                        minLines: 3,
+                        maxLines: 8,
+                        style: context.type.body,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(hintText: 'Anything else worth remembering'),
+                      ),
+                      const SizedBox(height: 20),
+                      VCard(
+                        padding: EdgeInsets.zero,
+                        child: ListRow(
+                          title: 'Keep it secret',
+                          subtitle: 'Blurred until you unlock with your face or fingerprint',
+                          glyph: G.lock,
+                          chevron: false,
+                          trailing: Switch.adaptive(
+                            value: _sensitive,
+                            onChanged: (v) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _sensitive = v);
                               _touch();
                             },
                           ),
-                      ],
-                    ),
-                    const _Label('Who & tags'),
-                    _tagsSection(),
-                    const _Label('Date'),
-                    _dateSection(),
-                    const _Label('Details'),
-                    _detailsSection(),
-                    const _Label('Photos'),
-                    _photos(),
-                    const _Label('Notes'),
-                    TextField(
-                      controller: _notes,
-                      onChanged: (_) => _touch(),
-                      minLines: 3,
-                      maxLines: 8,
-                      style: context.type.body,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(hintText: 'Anything else worth remembering'),
-                    ),
-                    const SizedBox(height: 20),
-                    VCard(
-                      padding: EdgeInsets.zero,
-                      child: ListRow(
-                        title: 'Keep it secret',
-                        subtitle: 'Blurred until you unlock with your face or fingerprint',
-                        glyph: G.lock,
-                        chevron: false,
-                        trailing: Switch.adaptive(
-                          value: _sensitive,
-                          onChanged: (v) {
-                            HapticFeedback.selectionClick();
-                            setState(() => _sensitive = v);
-                            _touch();
-                          },
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(Space.page, 8, Space.page, 12),
-                child: VButton(label: widget.isNew ? 'Save to vault' : 'Save changes', busy: _saving, onPressed: _save),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(Space.page, 8, Space.page, 12),
+                  child: VButton(
+                    label: widget.isNew ? 'Save to vault' : 'Save changes',
+                    busy: _saving,
+                    onPressed: _save,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

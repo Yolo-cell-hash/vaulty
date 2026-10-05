@@ -160,6 +160,7 @@ class MemoryRow extends StatelessWidget {
     return Pressable(
       onTap: () => openMemory(context, memory),
       scale: .99,
+      highlight: true,
       semanticLabel: memorySemantics(memory),
       excludeSemantics: true,
       child: Padding(

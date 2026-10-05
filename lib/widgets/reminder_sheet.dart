@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/memory.dart';
 import '../theme/app_theme.dart';
+import 'adaptive.dart';
 import 'common.dart';
 import 'glyphs.dart';
 
@@ -25,10 +26,9 @@ Future<ReminderChoice?> showReminderSheet(
   Recurrence recurrence = Recurrence.none,
   bool forDefaults = false,
 }) {
-  return showModalBottomSheet<ReminderChoice>(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => _ReminderSheet(
+  return showVSheet<ReminderChoice>(
+    context,
+    (_) => _ReminderSheet(
       defaults: defaults,
       offsets: offsets,
       minutes: minutes,
@@ -36,6 +36,7 @@ Future<ReminderChoice?> showReminderSheet(
       recurrence: recurrence,
       forDefaults: forDefaults,
     ),
+    isScrollControlled: true,
   );
 }
 
@@ -76,10 +77,10 @@ class _ReminderSheetState extends State<_ReminderSheet> {
   List<int> get _sorted => _offsets.toList()..sort((a, b) => b.compareTo(a));
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: _minutes ~/ 60, minute: _minutes % 60),
-      helpText: 'Remind me at',
+    final picked = await pickTime(
+      context,
+      initial: TimeOfDay(hour: _minutes ~/ 60, minute: _minutes % 60),
+      title: 'Remind me at',
     );
     if (picked != null) {
       setState(() {

@@ -10,10 +10,13 @@ import '../services/auth_service.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/adaptive.dart';
 import '../widgets/common.dart';
 import '../widgets/encrypted_image.dart';
+import '../widgets/flow_sheet.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/mascot.dart';
+import '../widgets/nav_bar.dart';
 import '../widgets/reminder_sheet.dart';
 import '../widgets/renew_sheet.dart';
 import '../widgets/tag_widgets.dart';
@@ -41,7 +44,7 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
     final ok = await AuthService.authenticate('Reveal this secret');
     if (!mounted) return;
     if (ok) {
-      HapticFeedback.mediumImpact();
+      Haptics.success();
       setState(() => _revealed = true);
     }
   }
@@ -51,51 +54,25 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
     showToast(context, 'Copied', icon: G.copy);
   }
 
-  Future<void> _more(Memory m) async {
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.l, 0, Space.l, Space.l),
-          child: ListGroup(
-            children: [
-              ListRow(
-                title: m.isArchived ? 'Restore' : 'Archive',
-                glyph: m.isArchived ? G.unarchive : G.archive,
-                chevron: false,
-                onTap: () => Navigator.pop(ctx, 'archive'),
-              ),
-              ListRow(
-                title: 'Delete',
-                glyph: G.trash,
-                danger: true,
-                chevron: false,
-                onTap: () => Navigator.pop(ctx, 'delete'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (action == null || !mounted) return;
+  Future<void> _archive(Memory m) async {
+    if (!mounted) return;
     final notifier = ref.read(vaultProvider.notifier);
     final nav = Navigator.of(context);
     final toast = toaster(context);
-    switch (action) {
-      case 'archive':
-        await notifier.setArchived(m.id, !m.isArchived);
-        nav.pop();
-        toast(m.isArchived ? 'Restored “${m.title}”' : 'Archived “${m.title}”', icon: G.archive);
-      case 'delete':
-        // No "are you sure?": deleting is undoable for a few seconds instead.
-        nav.pop();
-        await notifier.delete(m);
-        toast(
-          'Deleted “${m.title}”',
-          icon: G.trash,
-          action: SnackBarAction(label: 'Undo', onPressed: () => notifier.undoDelete(m.id)),
-        );
-    }
+    await notifier.setArchived(m.id, !m.isArchived);
+    nav.pop();
+    toast(m.isArchived ? 'Restored “${m.title}”' : 'Archived “${m.title}”', icon: G.archive);
+  }
+
+  Future<void> _delete(Memory m) async {
+    if (!mounted) return;
+    final notifier = ref.read(vaultProvider.notifier);
+    final nav = Navigator.of(context);
+    final toast = toaster(context);
+    // No "are you sure?": deleting is undoable for a few seconds instead.
+    nav.pop();
+    await notifier.delete(m);
+    toast('Deleted “${m.title}”', icon: G.trash, action: ToastAction('Undo', () => notifier.undoDelete(m.id)));
   }
 
   Future<void> _renew(Memory m) async {
@@ -136,7 +113,8 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
     final m = _find();
     if (m == null) {
       return Scaffold(
-        appBar: AppBar(
+        appBar: vAppBar(
+          context,
           leading: VIconButton(G.chevronLeft, label: 'Back', onTap: () => Navigator.pop(context)),
         ),
         body: const Center(
@@ -149,8 +127,10 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
     final firstSecret = m.metadata.isNotEmpty ? 0 : (m.attachments.isNotEmpty ? 1 : 2);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: vAppBar(
+        context,
         leading: VIconButton(G.chevronLeft, label: 'Back', onTap: () => Navigator.pop(context)),
+        largeTitle: m.title,
         actions: [
           VIconButton(
             G.pen,
@@ -160,10 +140,19 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
                 await _reveal();
                 if (!_revealed || !context.mounted) return;
               }
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => MemoryEditorScreen(initial: m)));
+              presentFlow<void>(context, (_) => MemoryEditorScreen(initial: m));
             },
           ),
-          VIconButton(G.more, label: 'More', onTap: () => _more(m)),
+          MenuButton(
+            actions: [
+              MenuAction(
+                m.isArchived ? 'Restore' : 'Archive',
+                m.isArchived ? G.unarchive : G.archive,
+                () => _archive(m),
+              ),
+              MenuAction('Delete', G.trash, () => _delete(m), destructive: true),
+            ],
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -385,6 +374,7 @@ class _DetailRow extends StatelessWidget {
     return Pressable(
       onTap: onCopy,
       scale: .99,
+      highlight: true,
       semanticLabel: '${entry.key}, ${entry.value}. Tap to copy',
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),

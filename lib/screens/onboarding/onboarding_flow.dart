@@ -1,8 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/auth_service.dart';
@@ -11,6 +8,7 @@ import '../../services/personalization.dart';
 import '../../services/settings.dart';
 import '../../state/vault_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/adaptive.dart';
 import '../../widgets/common.dart';
 import '../../widgets/glyphs.dart';
 import '../../widgets/mascot.dart';
@@ -319,23 +317,24 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
   }
 
   Widget _lockStep() {
+    // iOS names the unlock this phone has: Face ID, Touch ID or the passcode.
+    final ios = context.isCupertino;
+    final biometric = ref.watch(biometricProvider).value ?? Biometric.faceId;
+    final opener = !ios
+        ? 'Your fingerprint or PIN'
+        : (biometric == Biometric.passcode ? 'Your passcode' : '${biometric.label} or your passcode');
     return _frame(
       body: [
         const Mascot(size: 120, prop: MascotProp.key),
         const SizedBox(height: 16),
         Text('Lock it like a diary.', style: context.type.headline),
         const SizedBox(height: 8),
-        Text(
-          Platform.isIOS
-              ? 'Face ID or your passcode opens the vault. Nobody else gets in, not even us.'
-              : 'Your fingerprint or PIN opens the vault. Nobody else gets in, not even us.',
-          style: context.type.bodySoft,
-        ),
+        Text('$opener opens the vault. Nobody else gets in, not even us.', style: context.type.bodySoft),
       ],
       actions: [
         VButton(
-          label: Platform.isIOS ? 'Use Face ID' : 'Use fingerprint',
-          icon: Platform.isIOS ? G.faceId : G.fingerprint,
+          label: ios ? 'Use ${biometric.label}' : 'Use fingerprint',
+          icon: ios ? biometric.glyph : G.fingerprint,
           onPressed: () async {
             final toast = toaster(context);
             if (!await AuthService.isAvailable()) {
@@ -344,7 +343,7 @@ class _OnboardingFlowState extends ConsumerState<OnboardingFlow> {
             }
             final ok = await AuthService.authenticate('Turn on Vaulty app lock');
             if (!mounted || !ok) return;
-            HapticFeedback.mediumImpact();
+            Haptics.success();
             _lock = true;
             _next();
           },

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/memory.dart';
@@ -7,7 +6,9 @@ import '../../services/settings.dart';
 import '../../services/smart_parser.dart';
 import '../../state/vault_state.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/adaptive.dart';
 import '../../widgets/common.dart';
+import '../../widgets/flow_sheet.dart';
 import '../../widgets/glyphs.dart';
 import '../../widgets/memory_cards.dart';
 import '../../widgets/tag_widgets.dart';
@@ -57,9 +58,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen> {
     setState(() => _saving = true);
     await ref.read(vaultProvider.notifier).save(memoryFromParsed(_parsed, known: _known));
     if (!mounted) return;
-    HapticFeedback.mediumImpact();
+    Haptics.success();
     final toast = toaster(context);
-    Navigator.of(context).pop();
+    closeFlow(context);
     toast('Saved “${_parsed.title}”');
   }
 
@@ -77,7 +78,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen> {
     final hasText = _controller.text.trim().isNotEmpty;
     return Scaffold(
       appBar: AppBar(
-        leading: VIconButton(G.close, label: 'Close', onTap: () => Navigator.of(context).pop()),
+        leading: VIconButton(G.close, label: 'Close', onTap: () => closeFlow(context)),
       ),
       body: SafeArea(
         child: Column(

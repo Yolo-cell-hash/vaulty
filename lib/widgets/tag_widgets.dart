@@ -7,6 +7,7 @@ import '../screens/capture/draft.dart';
 import '../screens/tag_screen.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
+import 'adaptive.dart';
 import 'common.dart';
 import 'glyphs.dart';
 
@@ -113,11 +114,7 @@ class PeopleStrip extends StatelessWidget {
 
 /// Pick an existing person/tag or create one.
 Future<Tag?> pickTag(BuildContext context, {required TagKind kind, List<Tag> exclude = const []}) {
-  return showModalBottomSheet<Tag>(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => _TagPickerSheet(kind: kind, exclude: exclude),
-  );
+  return showVSheet<Tag>(context, (_) => _TagPickerSheet(kind: kind, exclude: exclude), isScrollControlled: true);
 }
 
 class _TagPickerSheet extends ConsumerStatefulWidget {

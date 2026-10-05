@@ -6,6 +6,7 @@ import '../services/settings.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/glyphs.dart';
+import '../widgets/nav_bar.dart';
 import 'capture/capture_sheet.dart';
 import 'me_screen.dart';
 import 'radar_screen.dart';
@@ -22,6 +23,10 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _tab = 0;
 
+  /// One per tab, so the status-bar tap (iOS) and a second tap on the tab
+  /// scroll only the page that's showing.
+  final _scrolls = List.generate(4, (_) => ScrollController());
+
   @override
   void initState() {
     super.initState();
@@ -30,26 +35,55 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     });
   }
 
+  @override
+  void dispose() {
+    for (final s in _scrolls) {
+      s.dispose();
+    }
+    super.dispose();
+  }
+
   void _select(int i) {
-    if (i == _tab) return;
+    if (i == _tab) {
+      // Tapping the open tab again goes back to its top.
+      final s = _scrolls[i];
+      if (s.hasClients && s.offset > 0) {
+        s.animateTo(0, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+      }
+      return;
+    }
     HapticFeedback.selectionClick();
     setState(() => _tab = i);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: IndexedStack(
-        index: _tab,
-        children: [
-          VaultHomeScreen(onOpenRadar: () => _select(1), onOpenSearch: () => _select(2), onOpenMe: () => _select(3)),
-          const RadarScreen(),
-          SearchScreen(active: _tab == 2),
-          const MeScreen(),
-        ],
+    final name = ref.watch(settingsProvider.select((s) => s.name.trim()));
+    final tabs = [
+      (
+        const Wordmark(size: 20),
+        VaultHomeScreen(onOpenRadar: () => _select(1), onOpenSearch: () => _select(2), onOpenMe: () => _select(3)),
       ),
-      bottomNavigationBar: _FloatingNav(index: _tab, onSelect: _select, onCapture: () => showCaptureSheet(context)),
+      (const Text('Radar'), const RadarScreen()),
+      (const Text('Search'), SearchScreen(active: _tab == 2)),
+      (Text(name.isEmpty ? 'You' : name), const MeScreen()),
+    ];
+    return PrimaryScrollController(
+      controller: _scrolls[_tab],
+      child: Scaffold(
+        extendBody: true,
+        body: IndexedStack(
+          index: _tab,
+          children: [
+            for (var i = 0; i < tabs.length; i++)
+              PrimaryScrollController(
+                controller: _scrolls[i],
+                child: ScrollEdgeBar(title: tabs[i].$1, threshold: i == 0 ? 96 : 56, child: tabs[i].$2),
+              ),
+          ],
+        ),
+        bottomNavigationBar: _FloatingNav(index: _tab, onSelect: _select, onCapture: () => showCaptureSheet(context)),
+      ),
     );
   }
 }
