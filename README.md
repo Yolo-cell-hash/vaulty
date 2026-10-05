@@ -70,7 +70,8 @@ flutter run
 
 - **Android**: minSdk 24. Release builds declare no `INTERNET` permission. R8 keep rules are in
   `android/app/proguard-rules.pro`.
-- **iOS**: deployment target 15.5 (required by ML Kit). Build on macOS with Xcode. On a Mac, run
+- **iOS**: iPhone only, portrait. iPads run it in iPhone compatibility mode (see [DESIGN.md](DESIGN.md)).
+  Deployment target 15.5 (required by ML Kit). Build on macOS with Xcode. On a Mac, run
   `cd ios && pod install` the first time.
 - Both need Flutter 3.44 or newer (Dart 3.12), as set in `pubspec.yaml`.
 

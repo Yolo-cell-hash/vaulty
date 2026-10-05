@@ -70,6 +70,10 @@ never for anything lighter. If you retune a token, re-run the contrast check bef
 ## Spacing, shape and motion
 
 - Spacing scale is 4, 8, 12, 16, 24, 32. Page gutter is 20.
+- Layouts are for phone widths: one portrait column. iOS ships iPhone-only, so iPads run the app in iPhone
+  compatibility mode. Before adding the iPad family back, give pages, sheets and the nav capsule a readable
+  max width and support every orientation on iPad, because a build that ships with iPad support can't drop
+  it in a later update.
 - Radii are 10, 14, 20 and 28. Buttons and chips are full pills.
 - Press feedback is a 0.97 scale plus a selection haptic (on iOS, plain taps stay silent and list rows shade
   instead; see [iOS and Android](#ios-and-android)). Springs use `easeOutBack` on **scale only**, never on
