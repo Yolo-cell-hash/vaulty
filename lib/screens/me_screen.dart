@@ -7,8 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/vault_database.dart';
 import '../models/memory.dart';
 import '../services/auth_service.dart';
+import '../services/calendar_service.dart';
 import '../services/notification_service.dart';
+import '../services/review_service.dart';
 import '../services/settings.dart';
+import '../services/update_service.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/adaptive.dart';
@@ -18,7 +21,9 @@ import '../widgets/mascot.dart';
 import '../widgets/memory_cards.dart';
 import '../widgets/nav_bar.dart';
 import '../widgets/reminder_sheet.dart';
+import '../widgets/update_prompt.dart';
 import 'backup_screen.dart';
+import 'calendar_import_screen.dart';
 import 'tag_screen.dart';
 
 class MeScreen extends ConsumerWidget {
@@ -36,6 +41,7 @@ class MeScreen extends ConsumerWidget {
     // iOS names the unlock it actually has; Android copy stays generic.
     final ios = context.isCupertino;
     final biometric = ref.watch(biometricProvider).value ?? Biometric.faceId;
+    final version = ref.watch(packageInfoProvider).value?.version;
     void push(Widget page) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
     return ListView(
@@ -155,6 +161,30 @@ class MeScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
         ListGroup(
+          header: 'Calendar',
+          children: [
+            ListRow(
+              title: 'Show dates in my calendar',
+              subtitle: settings.calendarSync
+                  ? 'In a calendar called Vaulty, kept up to date'
+                  : 'Titles and dates only, never the details',
+              glyph: G.calendar,
+              chevron: false,
+              trailing: Switch.adaptive(
+                value: settings.calendarSync,
+                onChanged: (on) => _setCalendarSync(context, ref, on),
+              ),
+            ),
+            ListRow(
+              title: 'Import from calendar',
+              subtitle: 'Birthdays, renewals and deadlines you already have',
+              glyph: G.download,
+              onTap: () => push(const CalendarImportScreen()),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        ListGroup(
           header: 'Appearance',
           children: [
             Padding(
@@ -177,6 +207,28 @@ class MeScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
         ListGroup(
+          header: 'About',
+          children: [
+            ListRow(
+              title: 'Rate Vaulty',
+              subtitle: 'A review helps other people find it',
+              glyph: G.star,
+              onTap: () async {
+                final toast = toaster(context);
+                final opened = await ReviewService.openStorePage(learnedAppStoreId: settings.appStoreId);
+                if (!opened) toast('Ratings open once Vaulty is in the App Store', icon: G.star);
+              },
+            ),
+            ListRow(
+              title: 'Check for updates',
+              subtitle: version == null ? null : 'You have version $version',
+              glyph: G.download,
+              onTap: () => checkForUpdate(context, ref, manual: true),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        ListGroup(
           children: [
             ListRow(
               title: 'Erase everything',
@@ -191,7 +243,10 @@ class MeScreen extends ConsumerWidget {
         const Center(child: Wordmark(size: 22)),
         const SizedBox(height: 6),
         Center(
-          child: Text('Version 1.0  ·  made without servers', style: context.type.caption.copyWith(color: c.inkFaint)),
+          child: Text(
+            '${version == null ? '' : 'Version $version  ·  '}made without servers',
+            style: context.type.caption.copyWith(color: c.inkFaint),
+          ),
         ),
       ],
     );
@@ -200,6 +255,58 @@ class MeScreen extends ConsumerWidget {
   static String _since(DateTime d) {
     final days = DateUtils.dateOnly(DateTime.now()).difference(DateUtils.dateOnly(d)).inDays;
     return days <= 0 ? 'today' : (days == 1 ? 'yesterday' : '$days days ago');
+  }
+
+  /// Turning on asks for calendar access, says where the calendar will sync
+  /// if it isn't kept on the phone, then fills it. Turning off deletes it.
+  Future<void> _setCalendarSync(BuildContext context, WidgetRef ref, bool on) async {
+    final toast = toaster(context);
+    final vault = ref.read(vaultProvider.notifier);
+    final settings = ref.read(settingsProvider.notifier);
+    if (!on) {
+      try {
+        await vault.stopCalendarSync();
+        toast('Removed the Vaulty calendar', icon: G.calendar);
+      } catch (e) {
+        toast('Couldn’t remove the calendar: $e', icon: G.warning);
+      }
+      return;
+    }
+    if (!await CalendarService.requestAccess().catchError((Object _) => false)) {
+      toast(
+        'Allow calendar access for Vaulty in Settings',
+        icon: G.calendar,
+        action: const ToastAction('Settings', CalendarService.openSettings),
+      );
+      return;
+    }
+    final home = await CalendarService.home();
+    if (!home.local) {
+      if (!context.mounted) return;
+      final ok = await confirmDialog(
+        context,
+        title: 'Sync with ${home.name}?',
+        message:
+            'Your phone keeps its calendars in ${home.name}, so the Vaulty calendar will sync there too. '
+            'It holds titles and dates only. Details, numbers and photos stay in Vaulty.',
+        confirm: 'Turn on',
+      );
+      if (!ok) return;
+    }
+    await settings.change((s) => s.copyWith(calendarSync: true));
+    try {
+      final count = await vault.syncCalendar();
+      Haptics.success();
+      toast(
+        count == 0
+            ? 'Calendar on. Dated items will show up there'
+            : 'Added $count ${count == 1 ? 'date' : 'dates'} to your calendar',
+        icon: G.calendar,
+      );
+    } catch (e) {
+      await settings.change((s) => s.copyWith(calendarSync: false));
+      toast('Couldn’t set up the calendar: $e', icon: G.warning);
+    }
   }
 
   Future<void> _editName(BuildContext context, WidgetRef ref, String current) async {

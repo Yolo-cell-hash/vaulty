@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../models/memory.dart';
 import '../services/auth_service.dart';
+import '../services/review_service.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
@@ -81,6 +82,7 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
     final toast = toaster(context);
     await ref.read(vaultProvider.notifier).renew(m, date);
     toast('Renewed until ${DateFormat('d MMM yyyy').format(date)}', icon: G.check);
+    if (mounted) ReviewService.maybeAsk(ref);
   }
 
   Future<void> _editReminders(Memory m) async {

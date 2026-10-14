@@ -57,6 +57,7 @@ enum G {
   flame,
   info,
   filter,
+  star,
 }
 
 class VIcon extends StatelessWidget {
@@ -623,6 +624,16 @@ class _GlyphPainter extends CustomPainter {
         _line(4, 7, 20, 7);
         _line(7, 12, 17, 12);
         _line(10, 17, 14, 17);
+      case G.star:
+        // Five points, sitting a touch low so it looks centred.
+        final star = Path();
+        for (var i = 0; i < 10; i++) {
+          final r = i.isEven ? 8.8 : 4.0;
+          final a = -math.pi / 2 + i * math.pi / 5;
+          final x = 12 + r * math.cos(a), y = 12.8 + r * math.sin(a);
+          i == 0 ? star.moveTo(x, y) : star.lineTo(x, y);
+        }
+        _path(star..close());
     }
     canvas.restore();
   }

@@ -158,7 +158,7 @@ class SmartParser {
       title = colonKey ?? _fallbackTitle(text, [...dates, ...fields, ...kwSpans]);
     }
 
-    final category = _inferCategory(text, expiry != null);
+    final category = categoryFor(text, hasDate: expiry != null);
     return ParsedCapture(
       title: _titleCase(title),
       category: category,
@@ -194,7 +194,7 @@ class SmartParser {
     final docMatch = _docKw.firstMatch(text);
     final title = docMatch != null ? _titleCase(docMatch.group(0)!.toLowerCase()) : _ocrTitle(text);
 
-    final category = _inferCategory(text, expiry != null);
+    final category = categoryFor(text, hasDate: expiry != null);
     return ParsedCapture(
       title: title,
       category: category,
@@ -695,14 +695,23 @@ class SmartParser {
 
   // ---------------------------------------------------------------- title --
 
-  MemoryCategory _inferCategory(String text, bool hasExpiry) {
+  /// The category [text] suggests, given whether it comes with a date.
+  static MemoryCategory categoryFor(String text, {required bool hasDate}) {
     if (_subscriptionKw.hasMatch(text)) return MemoryCategory.subscription;
-    if (hasExpiry && (_docKw.hasMatch(text) || _expiryKw.hasMatch(text))) return MemoryCategory.expiryDoc;
+    if (hasDate && (_docKw.hasMatch(text) || _expiryKw.hasMatch(text))) return MemoryCategory.expiryDoc;
     if (_measureKw.hasMatch(text)) return MemoryCategory.measurement;
     if (_docKw.hasMatch(text)) return MemoryCategory.expiryDoc;
-    if (hasExpiry) return MemoryCategory.other;
+    if (hasDate) return MemoryCategory.other;
     return MemoryCategory.staticFact;
   }
+
+  /// Whether [text] reads like something Vaulty keeps track of: a document,
+  /// a renewal, a birthday or a deadline.
+  static bool soundsTrackable(String text) =>
+      _docKw.hasMatch(text) ||
+      _subscriptionKw.hasMatch(text) ||
+      _yearlyOccasionKw.hasMatch(text) ||
+      _expiryKw.hasMatch(text);
 
   static final _trailingJunk = RegExp(
     r"(?:[\s,;:=\-–—#(]+|\s+(?:is|are|was|on|at|of|for|no\.?|number|num|=|-))+$",

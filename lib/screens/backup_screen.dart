@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../services/auth_service.dart';
+import '../services/backup_reminder.dart';
 import '../services/backup_service.dart';
+import '../services/notification_service.dart';
+import '../services/review_service.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
@@ -60,9 +63,47 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       Haptics.success();
       await ref.read(settingsProvider.notifier).change((s) => s.copyWith(lastBackup: DateTime.now()));
       toast('Backup saved. Keep the passphrase somewhere safe.', icon: G.shield);
+      if (mounted) ReviewService.maybeAsk(ref);
     } on Object catch (e) {
       toast('Backup failed: $e', icon: G.warning);
     }
+  }
+
+  // -------------------------------------------------------------- reminder --
+
+  Future<void> _pickReminder() async {
+    final current = ref.read(settingsProvider).backupEveryDays;
+    const title = 'Remind me to back up';
+    final picked = context.isCupertino
+        ? await showActionSheet<int>(context, [
+            for (final (days, label) in backupEveryChoices) (label, days),
+          ], title: title)
+        : await showVSheet<int>(
+            context,
+            (ctx) => SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(Space.l, 0, Space.l, Space.l),
+                child: ListGroup(
+                  header: title,
+                  children: [
+                    for (final (days, label) in backupEveryChoices)
+                      ListRow(
+                        title: label,
+                        chevron: false,
+                        trailing: days == current ? VIcon(G.check, size: 18, color: ctx.vc.brand, stroke: 2.2) : null,
+                        onTap: () => Navigator.pop(ctx, days),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+    if (picked == null || picked == current || !mounted) return;
+    final toast = toaster(context);
+    await ref.read(settingsProvider.notifier).change((s) => s.copyWith(backupEveryDays: picked));
+    if (picked == 0) return;
+    final ok = await AuthService.guardExternal(NotificationService.requestPermission);
+    if (!ok) toast('Saved. Turn on notifications for Vaulty in Settings', icon: G.bell);
   }
 
   // --------------------------------------------------------------- restore --
@@ -154,6 +195,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   Widget build(BuildContext context) {
     final c = context.vc;
     final lastBackup = ref.watch(settingsProvider.select((s) => s.lastBackup));
+    final every = ref.watch(settingsProvider.select((s) => s.backupEveryDays));
     final count = (ref.watch(vaultProvider).value ?? const []).length;
 
     return PopScope(
@@ -232,6 +274,18 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 28),
+                ListGroup(
+                  header: 'Reminder',
+                  children: [
+                    ListRow(
+                      title: 'Remind me to back up',
+                      subtitle: every == 0 ? 'Off' : '${backupEveryLabel(every)}, if anything has changed',
+                      glyph: G.bell,
+                      onTap: _pickReminder,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 22),
                 Text(

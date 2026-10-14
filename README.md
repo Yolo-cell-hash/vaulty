@@ -33,6 +33,21 @@ leaves the phone.
   until you verify.
 - **Encrypted `.vault` backups**: export everything, photos included, to Files / iCloud Drive / Google Drive,
   sealed with a passphrase. Restoring merges into the vault, and the most recently edited copy wins.
+- **Backup reminders**: while the vault has changes that aren't in a backup, a card on the home screen and a
+  notification at the usual reminder time say so. A never-backed-up vault gets its first nudge three days after
+  its first memory. The interval (off, weekly to every 3 months; monthly by default) is under You → Backup. Nudges
+  are on their own notification channel, and tapping one opens Backup.
+- **Calendar**: *Import from calendar* lists the next year of events from the phone's calendars, ticks the likely
+  ones (birthdays, renewals, documents, yearly dates) and copies the picked titles and days in. *Show dates in my
+  calendar* keeps a calendar called Vaulty with one all-day event per dated item, titles and dates only, updated as
+  the vault changes. On Android it's a local calendar that never syncs. On iOS it goes where new events go, and the
+  app says so before turning it on if that's iCloud or another account.
+- **Updates**: Android uses Google Play's in-app updates (through the Play Store, so no `INTERNET` permission).
+  iOS asks the App Store lookup and offers the listing. Both run about once a day after unlock, and on demand
+  under You → Check for updates.
+- **Ratings**: the system's own prompt after a save, a renewal or a backup, once the app is 4 days old with 5
+  memories, at most every 4 months. *Rate Vaulty* under You goes straight to the store's review page. Fill in
+  `appStoreId` in `lib/services/review_service.dart` once the app has an App Store record.
 - A privacy cover hides the vault in the app switcher, and the app auto-locks after 20 seconds in the
   background.
 
@@ -120,6 +135,12 @@ iOS 64-pending cap.
 database upgrades without data loss, migrations are safe to re-run, and soft delete/undo/purge behave.
 `test/adaptive_test.dart` checks that each platform gets its own dialogs, pickers, toasts, menus and sheets, that
 a flow sheet closes whole and holds unsaved changes, and that swipe actions fire.
+`test/backup_reminder_test.dart` and `test/backup_card_test.dart` cover when a backup is due, when the nudge fires,
+and the home screen card.
+`test/calendar_test.dart` covers what goes into the Vaulty calendar (never details) and how imported events become
+memories. The calendar reads and writes are native (`CalendarBridge.kt`, `CalendarBridge.swift`), so check them on a
+device.
+`test/store_test.dart` covers version comparison and the update and rating timing rules.
 
 ## Database upgrades
 
@@ -167,3 +188,8 @@ a flow sheet closes whole and holds unsaved changes, and that swipe actions fire
 - OCR uses Google ML Kit's bundled on-device model on both platforms. It is not Apple Vision.
 - Voice capture relies on the keyboard's dictation mic. No speech SDK is bundled, because some of them
   use the network.
+- Calendar repeats follow the calendar's rules, not Vaulty's: a monthly item on the 29th–31st skips short months
+  there, and a 29 February birthday shows only in leap years. Vaulty's own countdowns and reminders clamp to the
+  month's last day.
+- In-app updates and the rating prompt only work in builds installed from Google Play (internal testing counts) or
+  the App Store. TestFlight never shows the rating prompt.

@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/memory.dart';
+import '../services/backup_reminder.dart';
 import '../services/personalization.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
@@ -12,6 +15,7 @@ import '../widgets/glyphs.dart';
 import '../widgets/mascot.dart';
 import '../widgets/memory_cards.dart';
 import '../widgets/tag_widgets.dart';
+import 'backup_screen.dart';
 import 'capture/capture_sheet.dart';
 import 'capture/quick_capture_screen.dart';
 
@@ -54,6 +58,16 @@ class _VaultHomeScreenState extends ConsumerState<VaultHomeScreen> {
     final radar = ref.watch(radarProvider);
     final people = ref.watch(peopleProvider).where((p) => p.uses > 0).toList();
     final tags = ref.watch(tagsProvider).value ?? const <Tag>[];
+    final (lastBackup, backupEvery, backupSnoozed) = ref.watch(
+      settingsProvider.select((s) => (s.lastBackup, s.backupEveryDays, s.backupSnoozedUntil)),
+    );
+    final backupDue = backupIsDue(
+      items: items,
+      lastBackup: lastBackup,
+      everyDays: backupEvery,
+      now: DateTime.now(),
+      snoozedUntil: backupSnoozed,
+    );
 
     final filters = _filters(tags);
     final active = _filter < filters.length ? _filter : 0;
@@ -80,6 +94,13 @@ class _VaultHomeScreenState extends ConsumerState<VaultHomeScreen> {
         else if (items.isEmpty)
           const SliverFillRemaining(hasScrollBody: false, child: _EmptyVault())
         else ...[
+          if (backupDue)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(Space.l, 20, Space.l, 0),
+                child: _BackupCard(count: items.length, lastBackup: lastBackup, everyDays: backupEvery),
+              ),
+            ),
           if (radar.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: Padding(
@@ -219,6 +240,72 @@ class _Header extends ConsumerWidget {
             Text(summary, style: context.type.bodySoft.copyWith(color: c.inkSoft)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Shown while a backup is due and the vault has changes that aren't in one.
+class _BackupCard extends ConsumerWidget {
+  const _BackupCard({required this.count, required this.lastBackup, required this.everyDays});
+
+  final int count;
+  final DateTime? lastBackup;
+  final int everyDays;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.vc;
+    final last = lastBackup;
+    final days = last == null ? 0 : DateUtils.dateOnly(DateTime.now()).difference(DateUtils.dateOnly(last)).inDays;
+    return VCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              VIcon(G.shield, size: 20, color: c.warn),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(last == null ? 'Back up your vault' : 'Time for a backup', style: context.type.item),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            last == null
+                ? '$count ${count == 1 ? 'memory lives' : 'memories live'} only on this phone. '
+                      'If it’s lost, so are they.'
+                : 'Your last backup was $days ${days == 1 ? 'day' : 'days'} ago, and things have changed since.',
+            style: context.type.bodySoft,
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              VButton(
+                label: 'Back up now',
+                icon: G.upload,
+                height: 44,
+                expand: false,
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BackupScreen())),
+              ),
+              VButton(
+                label: 'Later',
+                kind: ButtonStyleKind.ghost,
+                height: 44,
+                expand: false,
+                onPressed: () => ref
+                    .read(settingsProvider.notifier)
+                    .change(
+                      (s) => s.copyWith(backupSnoozedUntil: DateTime.now().add(Duration(days: min(7, everyDays)))),
+                    ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
