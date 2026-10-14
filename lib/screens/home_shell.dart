@@ -1,12 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/settings.dart';
+import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/nav_bar.dart';
+import '../widgets/splash_intro.dart';
+import '../widgets/update_prompt.dart';
 import 'capture/capture_sheet.dart';
 import 'me_screen.dart';
 import 'radar_screen.dart';
@@ -27,11 +32,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   /// scroll only the page that's showing.
   final _scrolls = List.generate(4, (_) => ScrollController());
 
+  bool _updateChecked = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(settingsProvider.notifier).change((s) => s.withStreakTick(DateTime.now()));
+      _checkForUpdateOnce();
+    });
+  }
+
+  /// Once per launch, after the intro and any unlock, so a store prompt never
+  /// sits on top of the lock screen. The check itself runs about once a day.
+  void _checkForUpdateOnce() {
+    if (_updateChecked || !mounted || !(Platform.isAndroid || Platform.isIOS)) return;
+    final locked = ref.read(settingsProvider).lockEnabled && !ref.read(unlockedProvider);
+    if (!ref.read(splashDoneProvider) || locked) return;
+    _updateChecked = true;
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (mounted) checkForUpdate(context, ref);
     });
   }
 
@@ -58,6 +78,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(splashDoneProvider, (_, _) => _checkForUpdateOnce());
+    ref.listen(unlockedProvider, (_, _) => _checkForUpdateOnce());
     final name = ref.watch(settingsProvider.select((s) => s.name.trim()));
     final tabs = [
       (

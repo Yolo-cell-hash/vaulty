@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/memory.dart';
+import '../../services/review_service.dart';
 import '../../services/settings.dart';
 import '../../services/smart_parser.dart';
 import '../../state/vault_state.dart';
@@ -60,6 +61,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen> {
     if (!mounted) return;
     Haptics.success();
     final toast = toaster(context);
+    ReviewService.maybeAsk(ref);
     closeFlow(context);
     toast('Saved “${_parsed.title}”');
   }

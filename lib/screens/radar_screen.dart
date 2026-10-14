@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/memory.dart';
+import '../services/review_service.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
@@ -133,6 +134,7 @@ class _SwipeToArchive extends ConsumerWidget {
     if (date != null) {
       await ref.read(vaultProvider.notifier).renew(memory, date);
       toast('Renewed until ${dateFmt.format(date)}');
+      if (context.mounted) ReviewService.maybeAsk(ref);
     }
   }
 

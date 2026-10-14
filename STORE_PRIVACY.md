@@ -2,7 +2,7 @@
 
 The answers to give in App Store Connect ("App Privacy") and Play Console ("Data safety"), with the reasoning behind each. The public policy is in [PRIVACY.md](PRIVACY.md). Host it at a URL and paste that URL into both consoles.
 
-**The one thing to account for:** Vaulty's own code sends nothing anywhere. The only thing that can is Google ML Kit text recognition, which is built to send anonymous diagnostics to Google. Google lists what it sends here:
+**The things to account for:** Vaulty's own code sends nothing to us. On iOS it makes one kind of request, to Apple's App Store lookup for its own listing (see [Update checks](#update-checks)). The other thing that can send anything is Google ML Kit text recognition, which is built to send anonymous diagnostics to Google. Google lists what it sends here:
 
 - [Android data disclosure](https://developers.google.com/ml-kit/android-data-disclosure)
 - [iOS data disclosure](https://developers.google.com/ml-kit/ios-data-disclosure)
@@ -20,10 +20,17 @@ Re-check both after any dependency change. `flutter build apk --release`, then c
 - `POST_NOTIFICATIONS`
 - `VIBRATE`
 - `ACCESS_NETWORK_STATE`
+- `READ_CALENDAR` and `WRITE_CALENDAR` (added October 2026: calendar import and the optional Vaulty calendar)
 
 `ACCESS_NETWORK_STATE` comes from ML Kit's transport library. It only lets code ask whether a network exists. It cannot send anything, and it is left in so that library doesn't throw.
 
 ---
+
+## Update checks
+
+- **Android** uses Google Play's in-app updates (`in_app_update`) and in-app review (`in_app_review`). Both talk to the Play Store app on the phone, and the Play Store does the networking, so the release build still has no `INTERNET` permission. Re-check the merged manifest as above whenever these plugins update.
+- **iOS** sends `GET https://itunes.apple.com/lookup?bundleId=…&country=…` about once a day, and on **Check for updates**. It carries no user data and nothing from the vault, so it adds no data type to the App Privacy label. The privacy policy describes it.
+- To force an update on Android without a server, release with an in-app update priority of 4 or 5 through the Play Developer API (`inAppUpdatePriority` on the track release). Vaulty then shows Play's full-screen update.
 
 ## Apple App Store: App Privacy
 
@@ -37,7 +44,7 @@ Choose these data types and answer the same way for each:
 | Diagnostics → **Performance Data** | Latency and other performance metrics | No | No | Analytics |
 | Diagnostics → **Other Diagnostic Data** | Device model and OS, app version, API configuration, event types, error codes | No | No | Analytics |
 
-Everything else: **not collected**. That covers contact info, user content, photos, location, financial, health, browsing, search history, purchases, and usage data.
+Everything else: **not collected**. That covers contact info, user content, photos, location, financial, health, browsing, search history, purchases, and usage data. Calendar events Vaulty reads or writes stay on the phone (or in the user's own calendar account), so they aren't "collected" either.
 
 The resulting label reads **"Data Not Linked to You: Identifiers, Diagnostics"**, with no tracking section.
 
@@ -79,6 +86,7 @@ Other Play Console items:
   - `USE_BIOMETRIC`: app lock.
   - `POST_NOTIFICATIONS`: reminders.
   - `RECEIVE_BOOT_COMPLETED`: re-arms reminders after a reboot.
+  - `READ_CALENDAR` / `WRITE_CALENDAR`: importing dates, and the optional Vaulty calendar, which lives in a local account and never syncs.
   - None of these are restricted permissions.
 - **Target audience:** 13+ (see "Children" in the policy).
 
@@ -91,3 +99,5 @@ Other Play Console items:
 | Preferences (name, goals, reminder defaults) | Never. Stored in the Keychain or Keystore. |
 | Notifications | Local scheduler only. They show titles, never field values. |
 | ML Kit diagnostics | Android: never, because there is no network. iOS: sent to Google, anonymous. |
+| Calendar events | Read on the phone when importing. The Vaulty calendar holds titles and dates only: on Android it's local to the phone; on iOS it syncs only if the user's calendars do, and the app says so first. |
+| Update check | Android: through the Play Store app. iOS: a lookup to Apple with the app's identifier and store country, nothing else. |

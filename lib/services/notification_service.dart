@@ -48,6 +48,17 @@ List<PlannedReminder> planReminders(List<Memory> memories, ReminderDefaults defa
   return planned.take(limit).toList();
 }
 
+/// A reminder to back the vault up.
+class BackupNudge {
+  const BackupNudge(this.at, {required this.firstTime, required this.memories});
+
+  final DateTime at;
+
+  /// The vault has never been backed up.
+  final bool firstTime;
+  final int memories;
+}
+
 /// Schedules reminders with the OS alarm/notification queue only.
 class NotificationService {
   NotificationService._();
@@ -67,8 +78,12 @@ class NotificationService {
     return p;
   }
 
-  /// iOS keeps at most 64 pending local notifications per app.
+  /// iOS keeps at most 64 pending local notifications per app. Item
+  /// reminders get 60; the backup nudge takes one more.
   static const _maxPending = 60;
+
+  /// Tapping a backup nudge opens the Backup screen instead of a memory.
+  static const backupPayload = 'vaulty:backup';
 
   static const _details = NotificationDetails(
     android: AndroidNotificationDetails(
@@ -79,6 +94,18 @@ class NotificationService {
       priority: Priority.high,
       // White Vo silhouette; full-colour launcher icons render as a blank
       // square in the Android status bar.
+      icon: 'ic_stat_vaulty',
+      color: Color(0xFF7B5CFA),
+    ),
+    iOS: DarwinNotificationDetails(),
+  );
+
+  /// Its own channel, so backup nudges can be muted without muting expiries.
+  static const _backupDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'backup_nudge',
+      'Backup reminders',
+      channelDescription: 'A nudge when your vault has changes that aren’t backed up',
       icon: 'ic_stat_vaulty',
       color: Color(0xFF7B5CFA),
     ),
@@ -130,7 +157,12 @@ class NotificationService {
 
   /// Rebuilds the whole OS reminder queue from the vault: the soonest
   /// reminders win so iOS's 64-pending limit never drops an urgent one.
-  static Future<void> rescheduleAll(List<Memory> memories, MemoryRepository repo, ReminderDefaults defaults) async {
+  static Future<void> rescheduleAll(
+    List<Memory> memories,
+    MemoryRepository repo,
+    ReminderDefaults defaults, {
+    BackupNudge? backup,
+  }) async {
     await init();
     final planned = planReminders(memories, defaults, DateTime.now(), limit: _maxPending);
     try {
@@ -163,6 +195,30 @@ class NotificationService {
       }
     }
     await repo.replaceAllReminders(rows);
+    if (backup != null) await _scheduleBackup(backup, rnd.nextInt(1 << 30));
+  }
+
+  static Future<void> _scheduleBackup(BackupNudge b, int id) async {
+    final (title, body) = b.firstTime
+        ? (
+            'Back up your vault',
+            '${b.memories} ${b.memories == 1 ? 'memory lives' : 'memories live'} only on this phone. '
+                'A backup takes a minute.',
+          )
+        : ('Time for a backup', 'You’ve changed things since your last backup. Keep a fresh copy somewhere safe.');
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: tz.TZDateTime.from(b.at, tz.local),
+        notificationDetails: _backupDetails,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: backupPayload,
+      );
+    } catch (e) {
+      debugPrint('backup nudge failed: $e');
+    }
   }
 
   static Future<void> cancelAll() async {

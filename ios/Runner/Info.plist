@@ -18,6 +18,10 @@
 		<string>Vaulty uses Face ID to unlock your private, on-device vault.</string>
 		<key>NSCameraUsageDescription</key>
 		<string>Vaulty uses the camera to scan documents, tags and labels. Photos never leave your device.</string>
+		<key>NSCalendarsFullAccessUsageDescription</key>
+		<string>Vaulty can bring in birthdays and renewals from your calendars, and, if you turn it on, keep a Vaulty calendar of your dates. Only titles and dates go into it; the details stay in Vaulty.</string>
+		<key>NSCalendarsUsageDescription</key>
+		<string>Vaulty can bring in birthdays and renewals from your calendars, and, if you turn it on, keep a Vaulty calendar of your dates. Only titles and dates go into it; the details stay in Vaulty.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Vaulty lets you pick a photo to scan. Photos never leave your device.</string>
 		<key>CFBundleName</key>

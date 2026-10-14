@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/memory.dart';
 import '../services/attachment_store.dart';
 import '../services/ocr_service.dart';
+import '../services/review_service.dart';
 import '../services/settings.dart';
 import '../state/vault_state.dart';
 import '../theme/app_theme.dart';
@@ -196,6 +197,7 @@ class _MemoryEditorScreenState extends ConsumerState<MemoryEditorScreen> {
     if (!mounted) return;
     Haptics.success();
     final toast = toaster(context);
+    if (widget.isNew) ReviewService.maybeAsk(ref);
     closeFlow(context);
     toast(widget.isNew ? 'Saved “$title”' : 'Updated “$title”');
   }

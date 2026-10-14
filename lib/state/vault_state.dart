@@ -8,7 +8,9 @@ import '../data/vault_database.dart';
 import '../models/memory.dart';
 import '../services/attachment_store.dart';
 import '../services/auth_service.dart';
+import '../services/backup_reminder.dart';
 import '../services/backup_service.dart';
+import '../services/calendar_service.dart';
 import '../services/notification_service.dart';
 import '../services/settings.dart';
 
@@ -23,6 +25,8 @@ class VaultNotifier extends AsyncNotifier<List<Memory>> {
     // Repeating dates roll forward, so refresh the OS queue on every launch,
     // and again whenever the reminder defaults change.
     ref.listen(settingsProvider.select((s) => s.reminders), (_, _) => reschedule());
+    // A backup, or a new nudge interval, moves the next backup nudge.
+    ref.listen(settingsProvider.select((s) => (s.lastBackup, s.backupEveryDays)), (_, _) => reschedule());
     ref.onDispose(() {
       for (final t in _pendingDeletes.values) {
         t.cancel();
@@ -38,12 +42,43 @@ class VaultNotifier extends AsyncNotifier<List<Memory>> {
   Future<void> pendingReschedule = Future.value();
 
   void _schedule(List<Memory> items) {
+    final settings = ref.read(settingsProvider);
+    final nudge = nextBackupNudge(
+      items: items,
+      lastBackup: settings.lastBackup,
+      everyDays: settings.backupEveryDays,
+      minutes: settings.reminderMinutes,
+      now: DateTime.now(),
+    );
     // Reminders are derived data; a failure here must never block saving.
     pendingReschedule = NotificationService.rescheduleAll(
       items,
       repository,
-      ref.read(settingsProvider).reminders,
+      settings.reminders,
+      backup: nudge == null ? null : BackupNudge(nudge, firstTime: settings.lastBackup == null, memories: items.length),
     ).catchError((Object e) => debugPrint('reschedule failed: $e'));
+    if (settings.calendarSync) {
+      unawaited(syncCalendar(items).then<void>((_) {}, onError: (Object e) => debugPrint('calendar sync failed: $e')));
+    }
+  }
+
+  /// Mirrors dated items into Vaulty's calendar. Returns how many it holds.
+  /// Takes [items] when called before they're in [state] (on load, on reload).
+  Future<int> syncCalendar([List<Memory>? items]) async {
+    final list = items ?? _items;
+    final settings = ref.read(settingsProvider);
+    final id = await CalendarService.sync(list, calendarId: settings.calendarId);
+    if (id != settings.calendarId) {
+      await ref.read(settingsProvider.notifier).change((s) => s.copyWith(calendarId: id));
+    }
+    return calendarEntriesFor(list).length;
+  }
+
+  /// Turns calendar sync off and deletes Vaulty's calendar with it.
+  Future<void> stopCalendarSync() async {
+    final id = ref.read(settingsProvider).calendarId;
+    await ref.read(settingsProvider.notifier).change((s) => s.copyWith(calendarSync: false, calendarId: ''));
+    await CalendarService.removeCalendar(id);
   }
 
   /// Re-plans every reminder (e.g. after the default time changes).
@@ -64,6 +99,16 @@ class VaultNotifier extends AsyncNotifier<List<Memory>> {
       for (final a in previous.attachments.where((a) => !kept.contains(a.id))) {
         await AttachmentStore.remove(a);
       }
+    }
+    await _reload();
+  }
+
+  /// Saves several new memories at once (a calendar import), re-planning
+  /// reminders once rather than after each.
+  Future<void> saveAll(List<Memory> memories) async {
+    final now = DateTime.now();
+    for (final m in memories) {
+      await repository.save(m.copyWith(updatedAt: now));
     }
     await _reload();
   }
@@ -159,6 +204,10 @@ class VaultNotifier extends AsyncNotifier<List<Memory>> {
     }
     _pendingDeletes.clear();
     await NotificationService.cancelAll();
+    // Vaulty's calendar holds item titles, so it goes too.
+    if (ref.read(settingsProvider).calendarSync) {
+      await stopCalendarSync().catchError((Object e) => debugPrint('calendar removal failed: $e'));
+    }
     await AttachmentStore.wipe();
     await VaultDatabase.destroy();
     state = const AsyncData([]);

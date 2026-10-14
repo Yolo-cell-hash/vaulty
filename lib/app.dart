@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'screens/backup_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/lock_screen.dart';
 import 'screens/memory_detail_screen.dart';
@@ -42,17 +43,17 @@ class _VaultyAppState extends ConsumerState<VaultyApp> {
   void initState() {
     super.initState();
     _lifecycle = AppLifecycleListener(onStateChange: _onLifecycle);
-    // Tapping a reminder opens the memory it's about, whether the app was
-    // running (stream) or launched by the tap (launch payload).
-    _taps = NotificationService.taps.listen(_openMemory);
+    // Tapping a reminder opens the memory it's about (or Backup, for a backup
+    // nudge), whether the app was running (stream) or launched by the tap.
+    _taps = NotificationService.taps.listen(_openFromNotification);
     unawaited(_openLaunchNotification());
   }
 
   Future<void> _openLaunchNotification() async {
     try {
       await NotificationService.init();
-      final id = NotificationService.takeLaunchPayload();
-      if (id != null) _openMemory(id);
+      final payload = NotificationService.takeLaunchPayload();
+      if (payload != null) _openFromNotification(payload);
     } catch (e) {
       debugPrint('notifications unavailable: $e');
     }
@@ -65,14 +66,20 @@ class _VaultyAppState extends ConsumerState<VaultyApp> {
     super.dispose();
   }
 
-  void _openMemory(String id) {
+  void _openFromNotification(String payload) {
     if (!ref.read(settingsProvider).onboarded) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final nav = rootNavigatorKey.currentState;
       if (nav == null) return;
       // Back from the item lands on home, not on whatever was open before.
       nav.popUntil((r) => r.isFirst);
-      nav.push(MaterialPageRoute(builder: (_) => MemoryDetailScreen(memoryId: id)));
+      nav.push(
+        MaterialPageRoute(
+          builder: (_) => payload == NotificationService.backupPayload
+              ? const BackupScreen()
+              : MemoryDetailScreen(memoryId: payload),
+        ),
+      );
     });
   }
 
